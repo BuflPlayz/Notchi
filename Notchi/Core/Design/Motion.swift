@@ -1,0 +1,30 @@
+import AppKit
+import SwiftUI
+
+/// Animation presets. Every notch transition goes through here so Reduce Motion is respected everywhere.
+@MainActor
+enum Motion {
+    private static var reduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    /// Opening: lively spring with a hint of overshoot.
+    static var expand: Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.35, dampingFraction: 0.78)
+    }
+
+    /// Closing: same speed, no overshoot, so the surface settles cleanly back into the notch.
+    static var collapse: Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.32, dampingFraction: 0.92)
+    }
+
+    /// Small in-place changes (switching modules, compact content swaps).
+    static var content: Animation {
+        reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)
+    }
+
+    /// How compact and expanded content appear. Blur-in normally, plain fade with Reduce Motion.
+    static func contentTransition(reduceMotion: Bool) -> AnyTransition {
+        reduceMotion ? .opacity : AnyTransition(.blurReplace).combined(with: .scale(scale: 0.92, anchor: .top))
+    }
+}

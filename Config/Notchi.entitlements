@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Hardened runtime: allow Apple Events to Music and Spotify (AppleScript fallback for now playing). -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+	<!-- Hardened runtime: capture system audio for the visualizer (Core Audio process tap). -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>
