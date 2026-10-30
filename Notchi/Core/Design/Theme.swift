@@ -2,14 +2,32 @@ import SwiftUI
 
 /// Colors and type for content drawn on the notch.
 ///
-/// The surface is always pure black to match the hardware, in light and dark mode alike,
-/// so content is always light-on-black.
+/// The surface is pure black where it meets the hardware and fades to dark glass below,
+/// in light and dark mode alike, so content is always light-on-dark.
 enum Theme {
     static let surface = Color.black
+
+    /// Black laid over the glass, top to bottom: darkest under the menu bar, thinning toward the bottom.
+    /// `clarity` runs from 0 (solid black) to 1, where the bottom is bare glass.
+    static func glassTint(clarity: Double) -> [Gradient.Stop] {
+        [
+            .init(color: .black.opacity(1 - 0.7 * clarity), location: 0),
+            .init(color: .black.opacity(1 - 0.88 * clarity), location: 0.5),
+            .init(color: .black.opacity(1 - clarity), location: 1),
+        ]
+    }
+
+    /// Faint white lift at the bottom, so the glass reads lighter rather than just less black.
+    static func glassSheen(clarity: Double) -> Color { .white.opacity(0.08 * clarity) }
+
+    /// Light catching the surface's edge, dimmer at the top than the bottom. `brightness` runs from 0 to 1.
+    static func glassRim(brightness: Double) -> [Color] {
+        [.white.opacity(0.2 * brightness), .white.opacity(0.4 * brightness)]
+    }
     static let primary = Color.white
     static let secondary = Color.white.opacity(0.6)
     static let tertiary = Color.white.opacity(0.35)
-    /// Fill for controls sitting on the black surface.
+    /// Fill for controls sitting on the surface.
     static let controlFill = Color.white.opacity(0.1)
     static let controlFillPressed = Color.white.opacity(0.18)
 

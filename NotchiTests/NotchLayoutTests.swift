@@ -32,6 +32,29 @@ struct NotchLayoutTests {
         #expect(compact.size.width == geometry.idleSize.width + 2 * 80 + 2 * compact.topRadius)
     }
 
+    @Test func compactNotchReachesBelowTheHardware() {
+        let geometry = NotchGeometry.previewNotch
+        let compact = NotchLayout.make(state: .compact, geometry: geometry)
+
+        #expect(compact.headerHeight == geometry.idleSize.height)          // slots stay level with the menu bar
+        #expect(compact.size.height == geometry.idleSize.height + Metrics.Notch.compactBottomLip)
+    }
+
+    @Test func cornerSettingsShapeTheNotchAndCompactScalesAlong() {
+        let geometry = NotchGeometry.previewNotch
+        let expanded = NotchLayout.make(state: .expanded, geometry: geometry, cornerRadius: 16, topCurve: 28)
+        let compact = NotchLayout.make(state: .compact, geometry: geometry, cornerRadius: 16, topCurve: 28)
+
+        #expect(expanded.bottomRadius == 16)
+        #expect(expanded.topRadius == 28)
+        #expect(compact.bottomRadius == 16 * Metrics.Notch.compactBottomRadius / Metrics.Notch.expandedBottomRadius)
+        #expect(compact.topRadius == 28 * Metrics.Notch.compactTopRadius / Metrics.Notch.expandedTopRadius)
+        // The ears sit outside the slots, so a bigger curve widens the compact notch.
+        #expect(compact.size.width > NotchLayout.make(state: .compact, geometry: geometry).size.width)
+        // Out-of-range values are clamped.
+        #expect(NotchLayout.make(state: .expanded, geometry: geometry, cornerRadius: 500).bottomRadius == Metrics.Notch.cornerRadiusRange.upperBound)
+    }
+
     @Test func idleIslandIsCenteredInMenuBar() {
         let geometry = NotchGeometry.previewIsland
         let idle = NotchLayout.make(state: .idle, geometry: geometry)
@@ -47,10 +70,23 @@ struct NotchLayoutTests {
             let hit = layout.hitRect(in: geometry)
 
             #expect(hit.midX == geometry.centerX)
-            #expect(hit.width == layout.size.width)
+            #expect(hit.width == (geometry.style == .notch ? max(layout.size.width, geometry.idleSize.width) : layout.size.width))
             #expect(hit.maxY > geometry.screenFrame.maxY)
-            #expect(hit.minY == geometry.screenFrame.maxY - layout.topInset - layout.size.height)
+            // The notch's resting shape hides up inside the hardware; hovering still covers all of it.
+            let height = geometry.style == .notch ? max(layout.size.height, geometry.idleSize.height) : layout.size.height
+            #expect(hit.minY == geometry.screenFrame.maxY - layout.topInset - height)
         }
+    }
+
+    @Test func restingNotchHidesInsideTheHardware() {
+        let geometry = NotchGeometry.previewNotch
+        let idle = NotchLayout.make(state: .idle, geometry: geometry)
+
+        #expect(idle.size.height < geometry.idleSize.height)
+        #expect(idle.size.width < geometry.idleSize.width)
+        let hit = idle.hitRect(in: geometry)
+        #expect(hit.minY == geometry.screenFrame.maxY - geometry.idleSize.height)
+        #expect(hit.width == geometry.idleSize.width)
     }
 
     @Test func panelHoldsEveryStateWithRoomToOvershoot() {
@@ -88,7 +124,7 @@ struct NotchLayoutTests {
         let plain = NotchLayout.make(state: .compact, geometry: geometry)
         let withRow = NotchLayout.make(state: .compact, geometry: geometry, belowHeight: 18)
 
-        #expect(withRow.size.height == plain.size.height + 18)
+        #expect(withRow.size.height == plain.headerHeight + 18)             // the row replaces the notch's lip
         #expect(withRow.headerHeight == plain.headerHeight)              // the side row keeps its height
         #expect(withRow.size.width == plain.size.width)
         #expect(NotchLayout.make(state: .expanded, geometry: geometry, belowHeight: 18) == NotchLayout.make(state: .expanded, geometry: geometry))

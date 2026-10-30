@@ -12,10 +12,23 @@ enum HUDMetrics {
 }
 
 extension View {
-    /// Pins HUD content to the outer edge of its side slot.
+    /// Pins HUD content to the outer edge of its side slot, `HUDMetrics.inset` in, whatever the
+    /// compact layout setting.
     func hudSlot(_ edge: HorizontalEdge) -> some View {
-        frame(maxWidth: .infinity, alignment: edge == .leading ? .leading : .trailing)
-            .padding(edge == .leading ? .leading : .trailing, HUDMetrics.inset)
+        modifier(HUDSlot(edge: edge))
+    }
+}
+
+private struct HUDSlot: ViewModifier {
+    let edge: HorizontalEdge
+    @Environment(\.compactAlignment) private var alignment
+
+    func body(content: Content) -> some View {
+        // With Edges on, the slot has already pinned it and padded part of the way.
+        let padding = HUDMetrics.inset - (alignment == .edges ? Metrics.compactEdgeInset : 0)
+        content
+            .frame(maxWidth: .infinity, alignment: edge == .leading ? .leading : .trailing)
+            .padding(edge == .leading ? .leading : .trailing, padding)
     }
 }
 

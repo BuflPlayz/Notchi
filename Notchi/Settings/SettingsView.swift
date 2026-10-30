@@ -31,19 +31,39 @@ struct SettingsView: View {
                 .tabItem { Label("About", systemImage: "info.circle") }
                 .tag("about")
         }
-        .frame(width: 500)
+        .frame(width: SettingsWindowSize.width)
+        .background(SettingsWindowSize())
     }
 }
 
-/// A grouped form at the Settings window's width, sized to its content.
+/// Keeps the resizable Settings window at the panes' width, and opens it at a height that fits
+/// on screen (SwiftUI would otherwise pick its own default size).
+private struct SettingsWindowSize: NSViewRepresentable {
+    static let width: CGFloat = 500
+
+    func makeNSView(context: Context) -> NSView { WindowHook() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class WindowHook: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            window.contentMaxSize = NSSize(width: SettingsWindowSize.width, height: .greatestFiniteMagnitude)
+            // Room for the title bar, tabs and Dock.
+            let available = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+            window.setContentSize(NSSize(width: SettingsWindowSize.width, height: min(640, available - 160)))
+        }
+    }
+}
+
+/// A grouped form that fills the Settings window and scrolls when the window is shorter than it.
 struct SettingsPane<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
         Form { content }
             .formStyle(.grouped)
-            .scrollDisabled(true)
-            .fixedSize(horizontal: false, vertical: true)
+            .frame(minHeight: 240, maxHeight: .infinity)
     }
 }
 

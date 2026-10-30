@@ -18,6 +18,16 @@ enum Preferences {
         static let islandVisibleWhenIdle = "islandVisibleWhenIdle"
         static let clockShowsPaused = "clockShowsPaused"
         static let hideInFullScreen = "hideInFullScreen"
+        static let glassClarity = "glassClarity"
+        static let edgeHighlight = "edgeHighlight"
+        static let glassStyle = "glassStyle"
+        static let notchBlend = "notchBlend"
+        static let notchCornerRadius = "notchCornerRadius"
+        static let notchTopCurve = "notchTopCurve"
+        static let compactAlignment = "compactAlignment"
+        static let openAnimation = "openAnimation"
+        static let openDuration = "openDuration"
+        static let openBounce = "openBounce"
         /// Debug: draw the Dynamic Island even on a notched display. Launch with `-NotchiForceIsland YES`.
         static let forceIsland = "NotchiForceIsland"
     }
@@ -27,6 +37,8 @@ enum Preferences {
         Key.expandDelay, Key.collapseDelay, Key.hapticsEnabled, Key.compactSideWidth, Key.expandedWidth,
         Key.showAllMediaSources, Key.realAudioVisualizer, Key.replaceSystemHUD, Key.batteryAlerts,
         Key.focusAlerts, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen,
+        Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
+        Key.compactAlignment, Key.openAnimation, Key.openDuration, Key.openBounce,
     ]
 
     static func registerDefaults() {
@@ -45,6 +57,16 @@ enum Preferences {
             Key.islandVisibleWhenIdle: true,
             Key.clockShowsPaused: true,
             Key.hideInFullScreen: true,
+            Key.glassClarity: 85.0,
+            Key.edgeHighlight: 60.0,
+            Key.glassStyle: GlassStyle.clear.rawValue,
+            Key.notchBlend: Double(Metrics.Notch.hardwareBlend),
+            Key.notchCornerRadius: Double(Metrics.Notch.expandedBottomRadius),
+            Key.notchTopCurve: Double(Metrics.Notch.expandedTopRadius),
+            Key.compactAlignment: CompactAlignment.center.rawValue,
+            Key.openAnimation: OpenAnimation.snappy.rawValue,
+            Key.openDuration: 0.35,
+            Key.openBounce: 22.0,
             Key.forceIsland: false,
         ])
     }
@@ -76,6 +98,32 @@ enum Preferences {
     static var clockShowsPaused: Bool { value(Key.clockShowsPaused, default: true) }
     /// Toasts when a Focus turns on or off (needs Accessibility).
     static var focusAlerts: Bool { value(Key.focusAlerts, default: true) }
+    /// How see-through the surface is, in percent: 0 is solid black, 100 is as clear as the glass gets.
+    static var glassClarity: Double { value(Key.glassClarity, default: 85.0) }
+    /// Brightness of the light rim around the surface, in percent. 0 turns it off.
+    static var edgeHighlight: Double { value(Key.edgeHighlight, default: 60.0) }
+    /// How far the notch's black fades out into the glass, in points (notch style only).
+    static var notchBlend: Double { value(Key.notchBlend, default: Double(Metrics.Notch.hardwareBlend)) }
+    /// Bottom corner radius of the opened notch, in points (compact scales along).
+    static var notchCornerRadius: CGFloat {
+        CGFloat(value(Key.notchCornerRadius, default: Double(Metrics.Notch.expandedBottomRadius)))
+    }
+    /// Radius of the concave curves where the opened notch meets the top bezel, in points.
+    static var notchTopCurve: CGFloat {
+        CGFloat(value(Key.notchTopCurve, default: Double(Metrics.Notch.expandedTopRadius)))
+    }
+    /// How the notch springs open.
+    static var openAnimation: OpenAnimation {
+        OpenAnimation(rawValue: value(Key.openAnimation, default: "")) ?? .snappy
+    }
+    /// Custom open animation: spring response, in seconds.
+    static var openDuration: Double { value(Key.openDuration, default: 0.35) }
+    /// Custom open animation: overshoot, in percent (0 is none).
+    static var openBounce: Double { value(Key.openBounce, default: 22.0) }
+    /// Where live activity content sits in the compact slots beside the notch.
+    static var compactAlignment: CompactAlignment {
+        CompactAlignment(rawValue: value(Key.compactAlignment, default: "")) ?? .center
+    }
     static var forceIsland: Bool { value(Key.forceIsland, default: false) }
 
     /// Reads a stored value, falling back when nothing is stored or registered (tests and previews).

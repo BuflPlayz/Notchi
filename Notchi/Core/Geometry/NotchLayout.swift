@@ -21,33 +21,56 @@ struct NotchLayout: Equatable, Sendable {
     var headerHeight: CGFloat
     /// Extra window room around the shape for a drop shadow.
     var shadowPadding: CGFloat
+    /// Empty band below the header that only shows the surface's bottom edge (compact notch).
+    var bottomLip: CGFloat = 0
 
     /// - Parameters:
     ///   - sideWidth: Width of each compact slot (user setting, or a module's own request).
     ///   - expandedWidth: Width of the expanded panel (user setting).
     ///   - belowHeight: Compact only: extra height for a full-width row below the notch.
+    ///   - cornerRadius: Notch only: the expanded panel's bottom corner radius (user setting).
+    ///     Compact keeps the same proportion to its default.
+    ///   - topCurve: Notch only: the expanded panel's concave ear radius (user setting). Compact
+    ///     keeps the same proportion to its default.
     static func make(
         state: NotchState,
         geometry: NotchGeometry,
         sideWidth: CGFloat = Metrics.compactSideWidth,
         expandedWidth: CGFloat = Metrics.expandedWidth,
-        belowHeight: CGFloat = 0
+        belowHeight: CGFloat = 0,
+        cornerRadius: CGFloat = Metrics.Notch.expandedBottomRadius,
+        topCurve: CGFloat = Metrics.Notch.expandedTopRadius
     ) -> NotchLayout {
         let sideWidth = min(max(sideWidth, 0), Metrics.maxCompactSideWidth)
         let expandedWidth = min(max(expandedWidth, Metrics.expandedWidthRange.lowerBound), Metrics.expandedWidthRange.upperBound)
+        let corners = NotchCorners(
+            bottom: min(max(cornerRadius, Metrics.Notch.cornerRadiusRange.lowerBound), Metrics.Notch.cornerRadiusRange.upperBound),
+            top: min(max(topCurve, Metrics.Notch.topCurveRange.lowerBound), Metrics.Notch.topCurveRange.upperBound)
+        )
         var layout = switch geometry.style {
-        case .notch: notchLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth)
+        case .notch: notchLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth, corners: corners)
         case .island: islandLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth)
         }
         if state == .compact && belowHeight > 0 {
-            layout.size.height += belowHeight
+            // The row takes the lip's place: its own height already clears the notch.
+            layout.size.height = layout.headerHeight + belowHeight
+            layout.bottomLip = 0
             // A taller island stays a pill; the notch keeps its corner radius.
             if geometry.style == .island { layout.bottomRadius = min(layout.size.height / 2, Metrics.Island.compactHeight * 0.75) }
         }
         return layout
     }
 
-    private static func notchLayout(state: NotchState, geometry: NotchGeometry, sideWidth: CGFloat, expandedWidth: CGFloat) -> NotchLayout {
+    /// The expanded radii the user picked; compact scales them by its defaults' ratio.
+    private struct NotchCorners {
+        var bottom: CGFloat
+        var top: CGFloat
+
+        var compactBottom: CGFloat { bottom * Metrics.Notch.compactBottomRadius / Metrics.Notch.expandedBottomRadius }
+        var compactTop: CGFloat { top * Metrics.Notch.compactTopRadius / Metrics.Notch.expandedTopRadius }
+    }
+
+    private static func notchLayout(state: NotchState, geometry: NotchGeometry, sideWidth: CGFloat, expandedWidth: CGFloat, corners: NotchCorners) -> NotchLayout {
         let notch = geometry.idleSize
         switch state {
         case .idle:
@@ -57,18 +80,20 @@ struct NotchLayout: Equatable, Sendable {
                 horizontalInset: 0, centerGap: notch.width, headerHeight: notch.height, shadowPadding: 0
             )
         case .compact:
-            let ears = Metrics.Notch.compactTopRadius
+            let ears = corners.compactTop
+            let lip = Metrics.Notch.compactBottomLip
             return NotchLayout(
-                size: CGSize(width: notch.width + 2 * sideWidth + 2 * ears, height: notch.height),
-                topInset: 0, topRadius: ears, bottomRadius: Metrics.Notch.compactBottomRadius,
-                horizontalInset: ears, centerGap: notch.width, headerHeight: notch.height, shadowPadding: 0
+                size: CGSize(width: notch.width + 2 * sideWidth + 2 * ears, height: notch.height + lip),
+                topInset: 0, topRadius: ears, bottomRadius: corners.compactBottom,
+                horizontalInset: ears, centerGap: notch.width, headerHeight: notch.height, shadowPadding: 0,
+                bottomLip: lip
             )
         case .expanded:
-            let ears = Metrics.Notch.expandedTopRadius
+            let ears = corners.top
             let minimumWidth = notch.width + 2 * sideWidth + 2 * ears
             return NotchLayout(
                 size: CGSize(width: max(expandedWidth, minimumWidth), height: notch.height + Metrics.expandedContentHeight),
-                topInset: 0, topRadius: ears, bottomRadius: Metrics.Notch.expandedBottomRadius,
+                topInset: 0, topRadius: ears, bottomRadius: corners.bottom,
                 horizontalInset: ears, centerGap: notch.width, headerHeight: notch.height, shadowPadding: 0
             )
         }
@@ -110,13 +135,17 @@ struct NotchLayout: Equatable, Sendable {
 
     /// The shape's interactive area in global AppKit coordinates. It reaches up to (and 1 pt past) the
     /// screen's top edge, where `NSEvent.mouseLocation` sits when the cursor is pushed into the notch,
-    /// and covers the island's small gap above the capsule.
+    /// and covers the island's small gap above the capsule. In notch style it never shrinks below the
+    /// physical notch, even though the resting shape hides inside it.
     func hitRect(in geometry: NotchGeometry) -> CGRect {
-        let bottom = geometry.screenFrame.maxY - topInset - size.height
+        let minimum = geometry.style == .notch ? geometry.idleSize : .zero
+        let width = max(size.width, minimum.width)
+        let height = max(size.height, minimum.height)
+        let bottom = geometry.screenFrame.maxY - topInset - height
         return CGRect(
-            x: geometry.centerX - size.width / 2,
+            x: geometry.centerX - width / 2,
             y: bottom,
-            width: size.width,
+            width: width,
             height: geometry.screenFrame.maxY - bottom + 1
         )
     }
@@ -124,11 +153,13 @@ struct NotchLayout: Equatable, Sendable {
     /// The fixed panel frame for a display: top-anchored, centered on the notch, and big enough for
     /// the largest state (with its shadow) plus room for spring overshoot.
     static func panelFrame(in geometry: NotchGeometry) -> CGRect {
-        // Sized for the widest settings allowed, so changing them never resizes the panel.
+        // Sized for the widest settings allowed (the top curve widens the notch), so changing them
+        // never resizes the panel.
         let side = Metrics.maxCompactSideWidth
         let widest = Metrics.expandedWidthRange.upperBound
-        let expanded = make(state: .expanded, geometry: geometry, sideWidth: side, expandedWidth: widest)
-        let compact = make(state: .compact, geometry: geometry, sideWidth: side, expandedWidth: widest)
+        let ears = Metrics.Notch.topCurveRange.upperBound
+        let expanded = make(state: .expanded, geometry: geometry, sideWidth: side, expandedWidth: widest, topCurve: ears)
+        let compact = make(state: .compact, geometry: geometry, sideWidth: side, expandedWidth: widest, topCurve: ears)
         let contentWidth = max(expanded.size.width + 2 * expanded.shadowPadding, compact.size.width)
         let contentHeight = max(
             expanded.topInset + expanded.size.height + expanded.shadowPadding,

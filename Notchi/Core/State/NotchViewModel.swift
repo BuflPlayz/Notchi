@@ -32,10 +32,14 @@ final class NotchViewModel {
     @ObservationIgnored private var expandRequested = false
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var preferencesObserver: NSObjectProtocol?
-    /// While a size slider moves in Settings, the notch shows the state that size applies to.
+    /// While a size or appearance slider moves in Settings, the notch shows the state it applies to.
     @ObservationIgnored private var sizePreview: NotchState?
     @ObservationIgnored private var sizePreviewTask: Task<Void, Never>?
     @ObservationIgnored private var lastSizes = (compact: Preferences.compactSideWidth, expanded: Preferences.expandedWidth)
+    @ObservationIgnored private var lastLook = (clarity: Preferences.glassClarity, edge: Preferences.edgeHighlight, blend: Preferences.notchBlend)
+    @ObservationIgnored private var lastCorners = (bottom: Preferences.notchCornerRadius, top: Preferences.notchTopCurve)
+    @ObservationIgnored private var lastAlignment = Preferences.compactAlignment
+    @ObservationIgnored private var lastMotion = (style: Preferences.openAnimation, duration: Preferences.openDuration, bounce: Preferences.openBounce)
 
     init(geometry: NotchGeometry, registry: ModuleRegistry) {
         self.geometry = geometry
@@ -141,7 +145,9 @@ final class NotchViewModel {
             geometry: geometry,
             sideWidth: activity?.sideWidth ?? Preferences.compactSideWidth,
             expandedWidth: Preferences.expandedWidth,
-            belowHeight: activity?.belowHeight ?? 0
+            belowHeight: activity?.belowHeight ?? 0,
+            cornerRadius: Preferences.notchCornerRadius,
+            topCurve: Preferences.notchTopCurve
         )
     }
 
@@ -162,7 +168,40 @@ final class NotchViewModel {
             showSizePreview(sizes.expanded != lastSizes.expanded ? .expanded : .compact)
             lastSizes = sizes
         }
+        // Appearance sliders open the panel too, since that's where the glass shows best.
+        let look = (clarity: Preferences.glassClarity, edge: Preferences.edgeHighlight, blend: Preferences.notchBlend)
+        if look != lastLook {
+            showSizePreview(.expanded)
+            lastLook = look
+        }
+        let corners = (bottom: Preferences.notchCornerRadius, top: Preferences.notchTopCurve)
+        if corners != lastCorners {
+            showSizePreview(.expanded)
+            lastCorners = corners
+        }
+        if Preferences.compactAlignment != lastAlignment {
+            showSizePreview(.compact)
+            lastAlignment = Preferences.compactAlignment
+        }
+        let motion = (style: Preferences.openAnimation, duration: Preferences.openDuration, bounce: Preferences.openBounce)
+        if motion != lastMotion {
+            replayOpening()
+            lastMotion = motion
+        }
         reevaluate()
+    }
+
+    /// Shows off a new open animation: closes (the caller's `reevaluate` does that), then springs
+    /// open once the setting has been still for a moment.
+    private func replayOpening() {
+        sizePreview = nil
+        sizePreviewTask?.cancel()
+        sizePreviewTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(0.5))
+            guard !Task.isCancelled, let self else { return }
+            self.showSizePreview(.expanded)
+            self.reevaluate()
+        }
     }
 
     /// Holds the preview state until the slider has been still for a moment.

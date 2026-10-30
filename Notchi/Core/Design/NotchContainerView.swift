@@ -5,13 +5,17 @@ extension Notification.Name {
     static let notchiOpenSettings = Notification.Name("dev.notchi.openSettings")
 }
 
-/// Root view of the panel: the black surface plus whichever content the state calls for.
+/// Root view of the panel: the glass surface plus whichever content the state calls for.
 ///
 /// The surface is one view whose frame and corner radii animate between layouts, so every
 /// transition (idle ↔ compact ↔ expanded) is a single continuous, interruptible spring.
 struct NotchContainerView: View {
     let model: NotchViewModel
     @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = true
+    @AppStorage(Preferences.Key.glassClarity) private var glassClarity = 85.0
+    @AppStorage(Preferences.Key.glassStyle) private var glassStyle = GlassStyle.clear
+    @AppStorage(Preferences.Key.notchBlend) private var notchBlend = Double(Metrics.Notch.hardwareBlend)
+    @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = 60.0
 
     @Namespace private var namespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -23,8 +27,17 @@ struct NotchContainerView: View {
 
         content(layout: layout)
             .frame(width: layout.size.width, height: layout.size.height, alignment: .top)
-            .background(Theme.surface)
+            .background {
+                NotchSurface(
+                    shape: shape,
+                    notch: model.geometry.style == .notch ? model.geometry.idleSize : nil,
+                    clarity: glassClarity / 100,
+                    glass: glassStyle,
+                    blend: notchBlend * (model.state == .expanded ? Metrics.Notch.expandedBlendScale : 1)
+                )
+            }
             .clipShape(shape)
+            .overlay { NotchRim(shape: shape, style: model.geometry.style, brightness: rimBrightness) }
             .contentShape(shape)
             .shadow(color: .black.opacity(islandShadowOpacity), radius: 18, y: 8)
             .opacity(isHiddenAtRest ? 0 : 1)
@@ -75,6 +88,12 @@ struct NotchContainerView: View {
     private var isHiddenAtRest: Bool {
         guard model.state == .idle else { return false }
         return model.isSuppressed || (model.geometry.style == .island && !islandVisibleWhenIdle)
+    }
+
+    /// The outline fades out as the notch closes into the hardware, so it never lingers along the
+    /// notch's edge while the spring settles. The island keeps it: its capsule stays visible at rest.
+    private var rimBrightness: Double {
+        model.geometry.style == .notch && model.state == .idle ? 0 : edgeHighlight / 100
     }
 
     /// Only the expanded island casts a shadow: it floats over content instead of blending into hardware.

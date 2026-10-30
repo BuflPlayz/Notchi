@@ -24,6 +24,7 @@ struct ModulesSettingsView: View {
             }
         }
         .padding(20)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private func row(for module: any NotchModule) -> some View {

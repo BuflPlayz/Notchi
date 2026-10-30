@@ -10,5 +10,6 @@ struct NotchiApp: App {
         Settings {
             SettingsView(registry: appDelegate.environment.registry)
         }
+        .windowResizability(.contentMinSize)    // drag to resize; `SettingsView` keeps the width fixed
     }
 }
