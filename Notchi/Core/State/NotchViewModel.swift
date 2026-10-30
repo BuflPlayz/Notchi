@@ -135,8 +135,14 @@ final class NotchViewModel {
     }
 
     private func targetLayout(for state: NotchState) -> NotchLayout {
-        let sideWidth = registry.foreground?.liveActivity?.sideWidth ?? Preferences.compactSideWidth
-        return NotchLayout.make(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: Preferences.expandedWidth)
+        let activity = registry.foreground?.liveActivity
+        return NotchLayout.make(
+            state: state,
+            geometry: geometry,
+            sideWidth: activity?.sideWidth ?? Preferences.compactSideWidth,
+            expandedWidth: Preferences.expandedWidth,
+            belowHeight: activity?.belowHeight ?? 0
+        )
     }
 
     /// Size settings apply live: the surface springs to the new width while Settings is open.

@@ -23,4 +23,7 @@ struct LiveActivity: Equatable, Sendable {
     /// Still show while a full-screen app hides the notch. Only for feedback the user just asked
     /// for, like the volume HUD, since the system's own HUD is suppressed.
     var showsInFullScreen = false
+    /// Extra height for a full-width row below the notch (see `NotchModule.compactBelow()`), for
+    /// content that belongs to neither side, like the HUD's level bar. 0 keeps compact one row high.
+    var belowHeight: CGFloat = 0
 }

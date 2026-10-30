@@ -25,20 +25,26 @@ struct NotchLayout: Equatable, Sendable {
     /// - Parameters:
     ///   - sideWidth: Width of each compact slot (user setting, or a module's own request).
     ///   - expandedWidth: Width of the expanded panel (user setting).
+    ///   - belowHeight: Compact only: extra height for a full-width row below the notch.
     static func make(
         state: NotchState,
         geometry: NotchGeometry,
         sideWidth: CGFloat = Metrics.compactSideWidth,
-        expandedWidth: CGFloat = Metrics.expandedWidth
+        expandedWidth: CGFloat = Metrics.expandedWidth,
+        belowHeight: CGFloat = 0
     ) -> NotchLayout {
         let sideWidth = min(max(sideWidth, 0), Metrics.maxCompactSideWidth)
         let expandedWidth = min(max(expandedWidth, Metrics.expandedWidthRange.lowerBound), Metrics.expandedWidthRange.upperBound)
-        switch geometry.style {
-        case .notch:
-            return notchLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth)
-        case .island:
-            return islandLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth)
+        var layout = switch geometry.style {
+        case .notch: notchLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth)
+        case .island: islandLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth)
         }
+        if state == .compact && belowHeight > 0 {
+            layout.size.height += belowHeight
+            // A taller island stays a pill; the notch keeps its corner radius.
+            if geometry.style == .island { layout.bottomRadius = min(layout.size.height / 2, Metrics.Island.compactHeight * 0.75) }
+        }
+        return layout
     }
 
     private static func notchLayout(state: NotchState, geometry: NotchGeometry, sideWidth: CGFloat, expandedWidth: CGFloat) -> NotchLayout {

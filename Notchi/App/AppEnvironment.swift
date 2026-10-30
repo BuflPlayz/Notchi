@@ -58,7 +58,7 @@ final class AppEnvironment {
     /// Drive the notch from a terminal without touching the mouse, for testing and screen recordings:
     /// `swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("dev.notchi.debug"), object: "expand", userInfo: nil, deliverImmediately: true)'`
     /// Commands: `expand`, `collapse`, `show:<module id>` (open a module's page), `settings`,
-    /// `settings:<tab>` (general, modules, clock, media, system, about), `closeSettings`, `audioTap` (runs the visualizer's audio tap for 6 s and logs
+    /// `settings:<tab>` (general, modules, clock, media, system, about), `closeSettings`, `hud:volume:0.6` / `hud:brightness:0.3` / `hud:mute`, `audioTap` (runs the visualizer's audio tap for 6 s and logs
     /// the result under subsystem `dev.notchi.Notchi`, category `AudioTap`).
     private func installDebugCommands() {
         DistributedNotificationCenter.default().addObserver(
@@ -77,6 +77,8 @@ final class AppEnvironment {
                 case let command? where command.hasPrefix("settings:"):
                     UserDefaults.standard.set(String(command.dropFirst("settings:".count)), forKey: SettingsView.selectedTabKey)
                     NotificationCenter.default.post(name: .notchiOpenSettings, object: nil)
+                case let command? where command.hasPrefix("hud:"):
+                    (self?.registry.module(withID: "system") as? SystemModule)?.showDebugHUD(String(command.dropFirst("hud:".count)))
                 case "closeSettings":
                     NSApp.windows.filter { !($0 is NotchPanel) && $0.isVisible }.forEach { $0.close() }
                 case let command? where command.hasPrefix("show:"):

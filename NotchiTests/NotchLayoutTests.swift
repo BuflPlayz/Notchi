@@ -82,4 +82,18 @@ struct NotchLayoutTests {
         #expect(layout.shadowPadding > 0)
         #expect(NotchLayout.make(state: .expanded, geometry: .previewNotch).shadowPadding == 0)
     }
+
+    @Test(arguments: [NotchGeometry.previewNotch, NotchGeometry.previewIsland])
+    func rowBelowTheNotchGrowsCompactOnly(geometry: NotchGeometry) {
+        let plain = NotchLayout.make(state: .compact, geometry: geometry)
+        let withRow = NotchLayout.make(state: .compact, geometry: geometry, belowHeight: 18)
+
+        #expect(withRow.size.height == plain.size.height + 18)
+        #expect(withRow.headerHeight == plain.headerHeight)              // the side row keeps its height
+        #expect(withRow.size.width == plain.size.width)
+        #expect(NotchLayout.make(state: .expanded, geometry: geometry, belowHeight: 18) == NotchLayout.make(state: .expanded, geometry: geometry))
+        // Still fits inside the fixed panel.
+        let panel = NotchLayout.panelFrame(in: geometry)
+        #expect(withRow.hitRect(in: geometry).minY - panel.minY >= Metrics.panelMargin)
+    }
 }

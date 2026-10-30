@@ -20,7 +20,7 @@ enum SystemToast: Equatable, Sendable {
     /// Compact slot width the toast needs.
     var sideWidth: CGFloat {
         switch self {
-        case .volume, .brightness: 80
+        case .volume, .brightness: 44
         case .charging, .lowBattery, .focus: 46
         }
     }
@@ -34,6 +34,14 @@ enum SystemToast: Equatable, Sendable {
         case .charging: .charging
         case .lowBattery: .lowBattery
         case .focus: .focus
+        }
+    }
+
+    /// Height of the full-width row below the notch (the HUD's level bar); 0 for one-row toasts.
+    var belowHeight: CGFloat {
+        switch self {
+        case .volume, .brightness: HUDMetrics.barRowHeight
+        case .charging, .lowBattery, .focus: 0
         }
     }
 

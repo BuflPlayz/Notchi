@@ -21,6 +21,9 @@ protocol NotchModule: AnyObject, Observable {
     func compactLeading() -> AnyView
     /// Content for the slot right of the notch.
     func compactTrailing() -> AnyView
+    /// Full-width row below the notch in compact mode, shown when the live activity asks for
+    /// `belowHeight`. Nil by default.
+    func compactBelow() -> AnyView?
     /// The module's page in the expanded panel.
     func expandedView() -> AnyView
     /// Optional pane for the Settings window.
@@ -33,6 +36,7 @@ protocol NotchModule: AnyObject, Observable {
 }
 
 extension NotchModule {
+    func compactBelow() -> AnyView? { nil }
     func settingsView() -> AnyView? { nil }
     func start() {}
     func stop() {}

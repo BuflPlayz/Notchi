@@ -96,6 +96,7 @@ final class SystemModule: NotchModule {
 
     func compactLeading() -> AnyView { AnyView(SystemCompactLeading(module: self)) }
     func compactTrailing() -> AnyView { AnyView(SystemCompactTrailing(module: self)) }
+    func compactBelow() -> AnyView? { AnyView(SystemCompactBelow(module: self)) }
     func settingsView() -> AnyView? {
         AnyView(SystemSettingsView(module: self))
     }
@@ -198,6 +199,19 @@ final class SystemModule: NotchModule {
         show(.focus(state))
     }
 
+    #if DEBUG
+    /// Shows the HUD without pressing keys (debug command `hud:volume:0.6`, `hud:brightness:0.3`, `hud:mute`).
+    func showDebugHUD(_ spec: String) {
+        let parts = spec.split(separator: ":")
+        let level = parts.count > 1 ? Double(parts[1]) ?? 0.6 : 0.6
+        switch parts.first {
+        case "brightness": show(.brightness(level: level), force: true)
+        case "mute": show(.volume(level: level, isMuted: true), force: true)
+        default: show(.volume(level: level, isMuted: false), force: true)
+        }
+    }
+    #endif
+
     // MARK: Toasts
 
     /// Shows a toast as a transient live activity. `force` lets a HUD update replace itself on
@@ -215,7 +229,8 @@ final class SystemModule: NotchModule {
         let activity = LiveActivity(
             priority: .transient,
             sideWidth: max(Preferences.compactSideWidth, newToast.sideWidth),
-            showsInFullScreen: isHUD
+            showsInFullScreen: isHUD,
+            belowHeight: newToast.belowHeight
         )
         if liveActivity != activity { liveActivity = activity }
         toastTask?.cancel()

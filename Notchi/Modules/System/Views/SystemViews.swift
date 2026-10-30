@@ -2,6 +2,23 @@ import SwiftUI
 
 // MARK: - Compact (toasts)
 
+/// Spacing for the volume and brightness HUD. One inset is used for the icon's left edge, the
+/// number's right edge and both ends of the bar, so the HUD mirrors itself around the notch.
+enum HUDMetrics {
+    /// Distance from the shape's sides (inside the notch's ears) to the HUD's content.
+    static let inset: CGFloat = 12
+    static let barRowHeight: CGFloat = 18
+    static let barHeight: CGFloat = 5
+}
+
+extension View {
+    /// Pins HUD content to the outer edge of its side slot.
+    func hudSlot(_ edge: HorizontalEdge) -> some View {
+        frame(maxWidth: .infinity, alignment: edge == .leading ? .leading : .trailing)
+            .padding(edge == .leading ? .leading : .trailing, HUDMetrics.inset)
+    }
+}
+
 /// Left slot: the toast's icon.
 struct SystemCompactLeading: View {
     let module: SystemModule
@@ -10,9 +27,9 @@ struct SystemCompactLeading: View {
         Group {
             switch module.toast {
             case .volume(let level, let isMuted):
-                VolumeHUDIcon(level: level, isMuted: isMuted)
+                VolumeHUDIcon(level: level, isMuted: isMuted).hudSlot(.leading)
             case .brightness(let level):
-                BrightnessHUDIcon(level: level)
+                BrightnessHUDIcon(level: level).hudSlot(.leading)
             case .charging(let battery):
                 BatteryGlyph(battery: battery)
             case .lowBattery(let battery):
@@ -36,9 +53,9 @@ struct SystemCompactTrailing: View {
         Group {
             switch module.toast {
             case .volume(let level, let isMuted):
-                HUDLevel(value: level, isMuted: isMuted)
+                HUDValue(value: level, isMuted: isMuted).hudSlot(.trailing)
             case .brightness(let level):
-                HUDLevel(value: level, isMuted: false)
+                HUDValue(value: level, isMuted: false).hudSlot(.trailing)
             case .charging(let battery):
                 Text("\(battery.percent)%").foregroundStyle(.green)
             case .lowBattery(let battery):
@@ -54,24 +71,41 @@ struct SystemCompactTrailing: View {
     }
 }
 
-/// The HUD's right side: a level bar and the percentage, whose digits roll as it changes.
-/// Animated by the transaction the module updates the toast in (`Motion.hud`).
-struct HUDLevel: View {
+/// The HUD's percentage, whose digits roll as it changes. Animated by the transaction the
+/// module updates the toast in (`Motion.hud`).
+struct HUDValue: View {
     let value: Double
     let isMuted: Bool
 
     private var percent: Int { isMuted ? 0 : Int((min(max(value, 0), 1) * 100).rounded()) }
 
     var body: some View {
-        HStack(spacing: 7) {
-            LevelBar(value: isMuted ? 0 : value)
-            Text("\(percent)")
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(isMuted ? Theme.tertiary : Theme.primary)
-                .contentTransition(.numericText(value: Double(percent)))
-                .frame(width: 24, alignment: .trailing)
+        Text("\(percent)")
+            .font(.system(size: 13, weight: .semibold).monospacedDigit())
+            .foregroundStyle(isMuted ? Theme.tertiary : Theme.primary)
+            .contentTransition(.numericText(value: Double(percent)))
+    }
+}
+
+/// The full-width row below the notch: the HUD's level bar, inset to line up with the icon and
+/// the number above it.
+struct SystemCompactBelow: View {
+    let module: SystemModule
+
+    var body: some View {
+        Group {
+            switch module.toast {
+            case .volume(let level, let isMuted):
+                LevelBar(value: isMuted ? 0 : level)
+            case .brightness(let level):
+                LevelBar(value: level)
+            default:
+                EmptyView()
+            }
         }
-        .padding(.trailing, 2)
+        .padding(.horizontal, HUDMetrics.inset)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.top, 3)
     }
 }
 
@@ -90,7 +124,7 @@ struct LevelBar: View {
                     .shadow(color: Theme.primary.opacity(0.35), radius: 3)
             }
         }
-        .frame(height: 5)
+        .frame(height: HUDMetrics.barHeight)
     }
 }
 
@@ -104,11 +138,12 @@ struct VolumeHUDIcon: View {
             .foregroundStyle(Theme.primary)
             .contentTransition(.symbolEffect(.replace))
             .symbolEffect(.bounce, value: isMuted)
-            .frame(width: 22)
+            .frame(width: 22, alignment: .leading)
     }
 }
 
-/// Sun that turns as brightness changes, and swaps between its small and large form.
+/// Sun that grows with brightness (from its leading edge, so the HUD's padding never shifts) and
+/// swaps between its small and large form.
 struct BrightnessHUDIcon: View {
     let level: Double
 
@@ -116,8 +151,8 @@ struct BrightnessHUDIcon: View {
         Image(systemName: level < 0.5 ? "sun.min.fill" : "sun.max.fill")
             .foregroundStyle(Theme.primary)
             .contentTransition(.symbolEffect(.replace))
-            .rotationEffect(.degrees(level * 90))
-            .frame(width: 22)
+            .scaleEffect(0.8 + 0.2 * min(max(level, 0), 1), anchor: .leading)
+            .frame(width: 18, alignment: .leading)
     }
 }
 
@@ -302,20 +337,33 @@ struct NotchSlider: View {
 
 // MARK: - Previews
 
+/// The HUD laid out like in the notch: icon and number on the outer edges, bar below.
+private struct HUDPreviewRow: View {
+    let icon: AnyView
+    let value: Double
+    let isMuted: Bool
+
+    var body: some View {
+        VStack(spacing: 3) {
+            HStack {
+                icon.hudSlot(.leading)
+                Spacer(minLength: 120)
+                HUDValue(value: value, isMuted: isMuted).hudSlot(.trailing)
+            }
+            .frame(height: 32)
+            LevelBar(value: isMuted ? 0 : value).padding(.horizontal, HUDMetrics.inset)
+        }
+        .frame(width: 280)
+        .padding(.bottom, 10)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
 #Preview("Compact toasts") {
     VStack(spacing: 12) {
-        HStack(spacing: 20) {
-            VolumeHUDIcon(level: 0.6, isMuted: false)
-            HUDLevel(value: 0.6, isMuted: false).frame(width: 76)
-        }
-        HStack(spacing: 20) {
-            BrightnessHUDIcon(level: 0.3)
-            HUDLevel(value: 0.3, isMuted: false).frame(width: 76)
-        }
-        HStack(spacing: 20) {
-            VolumeHUDIcon(level: 0.6, isMuted: true)
-            HUDLevel(value: 0.6, isMuted: true).frame(width: 76)
-        }
+        HUDPreviewRow(icon: AnyView(VolumeHUDIcon(level: 0.6, isMuted: false)), value: 0.6, isMuted: false)
+        HUDPreviewRow(icon: AnyView(BrightnessHUDIcon(level: 0.3)), value: 0.3, isMuted: false)
+        HUDPreviewRow(icon: AnyView(VolumeHUDIcon(level: 0.6, isMuted: true)), value: 0.6, isMuted: true)
         HStack(spacing: 20) {
             BatteryGlyph(battery: BatteryState(level: 0.76, isPluggedIn: true, isCharging: true))
             Text("76%").foregroundStyle(.green)
@@ -335,10 +383,7 @@ struct NotchSlider: View {
         @State private var level = 0.3
         var body: some View {
             VStack(spacing: 14) {
-                HStack(spacing: 20) {
-                    VolumeHUDIcon(level: level, isMuted: false)
-                    HUDLevel(value: level, isMuted: false).frame(width: 76)
-                }
+                HUDPreviewRow(icon: AnyView(VolumeHUDIcon(level: level, isMuted: false)), value: level, isMuted: false)
                 HStack {
                     Button("−") { withAnimation(Motion.hud) { level = LevelStep.next(from: level, up: false, fine: false) } }
                     Button("+") { withAnimation(Motion.hud) { level = LevelStep.next(from: level, up: true, fine: false) } }
