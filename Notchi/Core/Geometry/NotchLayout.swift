@@ -23,6 +23,12 @@ struct NotchLayout: Equatable, Sendable {
     var shadowPadding: CGFloat
     /// Empty band below the header that only shows the surface's bottom edge (compact notch).
     var bottomLip: CGFloat = 0
+    /// Diameter of the activity bubbles beside the compact surface. The same in every state, so a
+    /// bubble on its way out never changes size.
+    var satelliteDiameter: CGFloat = 0
+    /// Gap between the top of the screen and a bubble: centered in the notch's height, or level
+    /// with the compact island.
+    var satelliteTop: CGFloat = 0
 
     /// - Parameters:
     ///   - sideWidth: Width of each compact slot (user setting, or a module's own request).
@@ -58,7 +64,33 @@ struct NotchLayout: Equatable, Sendable {
             // A taller island stays a pill; the notch keeps its corner radius.
             if geometry.style == .island { layout.bottomRadius = min(layout.size.height / 2, Metrics.Island.compactHeight * 0.75) }
         }
+        switch geometry.style {
+        case .notch:
+            layout.satelliteTop = Metrics.Satellite.notchInset
+            layout.satelliteDiameter = geometry.idleSize.height - 2 * Metrics.Satellite.notchInset
+        case .island:
+            layout.satelliteTop = Metrics.Island.compactTopInset
+            layout.satelliteDiameter = Metrics.Island.compactHeight
+        }
         return layout
+    }
+
+    /// Horizontal distance from the notch's center to a bubble's center. The gap is measured from the
+    /// surface's wall, not the tips of the notch's ears, so it looks the same in both styles, but the
+    /// bubble always stays clear of the ears (they flare wider with a big "Top curve").
+    var satelliteCenterOffset: CGFloat {
+        size.width / 2 + max(Metrics.Satellite.gap - topRadius, 1) + satelliteDiameter / 2
+    }
+
+    /// A bubble's clickable area in global AppKit coordinates.
+    func satelliteHitRect(_ side: SatelliteSide, in geometry: NotchGeometry) -> CGRect {
+        let centerX = geometry.centerX + side.sign * satelliteCenterOffset
+        return CGRect(
+            x: centerX - satelliteDiameter / 2,
+            y: geometry.screenFrame.maxY - satelliteTop - satelliteDiameter,
+            width: satelliteDiameter,
+            height: satelliteDiameter
+        )
     }
 
     /// The expanded radii the user picked; compact scales them by its defaults' ratio.
@@ -160,7 +192,9 @@ struct NotchLayout: Equatable, Sendable {
         let ears = Metrics.Notch.topCurveRange.upperBound
         let expanded = make(state: .expanded, geometry: geometry, sideWidth: side, expandedWidth: widest, topCurve: ears)
         let compact = make(state: .compact, geometry: geometry, sideWidth: side, expandedWidth: widest, topCurve: ears)
-        let contentWidth = max(expanded.size.width + 2 * expanded.shadowPadding, compact.size.width)
+        // Compact needs room for a bubble on each side.
+        let compactWidth = 2 * (compact.satelliteCenterOffset + compact.satelliteDiameter / 2)
+        let contentWidth = max(expanded.size.width + 2 * expanded.shadowPadding, compactWidth)
         let contentHeight = max(
             expanded.topInset + expanded.size.height + expanded.shadowPadding,
             compact.topInset + compact.size.height

@@ -21,6 +21,9 @@ protocol NotchModule: AnyObject, Observable {
     func compactLeading() -> AnyView
     /// Content for the slot right of the notch.
     func compactTrailing() -> AnyView
+    /// One glyph for the round bubble beside the notch, shown while another activity has the
+    /// middle. Defaults to `compactLeading()`.
+    func compactMinimal() -> AnyView
     /// Full-width row below the notch in compact mode, shown when the live activity asks for
     /// `belowHeight`. Nil by default.
     func compactBelow() -> AnyView?
@@ -36,6 +39,7 @@ protocol NotchModule: AnyObject, Observable {
 }
 
 extension NotchModule {
+    func compactMinimal() -> AnyView { compactLeading() }
     func compactBelow() -> AnyView? { nil }
     func settingsView() -> AnyView? { nil }
     func start() {}

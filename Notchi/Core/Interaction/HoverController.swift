@@ -13,6 +13,8 @@ final class HoverController {
 
     private let panel: NSPanel
     private var hitRect: CGRect = .zero
+    /// Areas that take clicks without counting as a hover (the activity bubbles beside the notch).
+    private var clickRects: [CGRect] = []
     private var isInside = false
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -43,16 +45,20 @@ final class HoverController {
         localMonitor = nil
     }
 
-    /// Sets the interactive area (screen coordinates) to the shape's new target frame.
-    func setHitRect(_ rect: CGRect) {
+    /// Sets the interactive area (screen coordinates) to the shape's new target frame, plus areas
+    /// that only need to be clickable.
+    func setHitRect(_ rect: CGRect, clickable: [CGRect] = []) {
         hitRect = rect
+        clickRects = clickable
         update(cursorMoved: false)
     }
 
     private func update(cursorMoved: Bool) {
-        let inside = hitRect.contains(NSEvent.mouseLocation)
-        if panel.ignoresMouseEvents == inside {
-            panel.ignoresMouseEvents = !inside
+        let location = NSEvent.mouseLocation
+        let inside = hitRect.contains(location)
+        let clickable = inside || clickRects.contains { $0.contains(location) }
+        if panel.ignoresMouseEvents == clickable {
+            panel.ignoresMouseEvents = !clickable
         }
         guard inside != isInside else { return }
         // A shape that grows under a resting cursor (a live activity appearing) shouldn't count as

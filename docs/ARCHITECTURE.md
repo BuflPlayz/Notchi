@@ -137,7 +137,14 @@ struct LiveActivity: Equatable {
 }
 ```
 
-The registry picks the highest-priority live activity for the compact slots. If two activities are active (for example, music plus a running timer), the winner gets both slots and the runner-up shows as a small indicator dot (see open question 6).
+The registry picks the highest-priority live activity for the compact slots. If other activities are running too (for example, music plus a running timer), up to two of them float beside the compact notch as detached round bubbles, like the iPhone's Dynamic Island.
+
+**Stacked activities (implemented).**
+- `ModuleRegistry.primary` is the activity in the middle: the one the user clicked into place (`preferredID`, kept while its activity lasts and until another one turns `urgent`), else the highest priority. Toasts (`transient`) still show over it and never become bubbles, so a volume press doesn't reshuffle anything.
+- `SatelliteSlots` keeps the bubbles sticky: a lone bubble goes on the trailing side, a second one on the leading side, and a bubble keeps its side while its activity runs. Bubbles show only in compact mode, never over a full-screen app. A module draws its bubble with `NotchModule.compactMinimal()` (default: `compactLeading()`).
+- Clicking a bubble swaps it with the middle activity, which takes the bubble's exact slot. The "warp" runs in two beats: the clicked bubble stretches toward the notch and blurs into it (`SatelliteWarp`) while the surface squashes wide and springs back (`swapPulse`). 120 ms later the replaced activity squeezes out of the notch's edge with an overshooting spring. The view model sequences the beats; an animation attached to the transition itself held insertions back until removals had finished.
+- Bubbles take clicks but don't count as a hover (`HoverController`'s click-only rects), so they never open the panel. The fixed panel is sized to fit a bubble on each side of the widest compact notch.
+- Debug: `swap:<module id>` (see `AppEnvironment`) clicks a module's bubble.
 
 Later-phase modules plug in through the same protocol: File Shelf, AirPods, Clipboard, and Agent Activity. **Agent integration** gets a local inbound channel in the core: a `notchi://` URL scheme plus a small bundled `notchi` CLI that talks to the app over a Unix-domain socket. Claude Code hooks (or any agent) can then run `notchi notify --source claude --status running "Editing 3 files"`, and an `AgentModule` renders it as a live activity.
 

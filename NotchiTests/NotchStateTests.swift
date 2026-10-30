@@ -63,6 +63,109 @@ struct ModuleRegistryTests {
     }
 }
 
+struct SatelliteSlotsTests {
+    @Test func loneBubbleGoesTrailingThenLeading() {
+        let one = SatelliteSlots().reconciled(with: ["a"])
+        #expect(one == SatelliteSlots(leading: nil, trailing: "a"))
+        let two = one.reconciled(with: ["b", "a"])
+        #expect(two == SatelliteSlots(leading: "b", trailing: "a"))
+    }
+
+    @Test func bubblesKeepTheirSides() {
+        let slots = SatelliteSlots(leading: "a", trailing: "b")
+        #expect(slots.reconciled(with: ["b"]) == SatelliteSlots(leading: nil, trailing: "b"))
+        #expect(slots.reconciled(with: ["b", "a"]) == slots)
+    }
+
+    @Test func extraCandidatesDontShow() {
+        let slots = SatelliteSlots().reconciled(with: ["a", "b", "c"])
+        #expect(slots.occupied.count == 2)
+        #expect(slots.side(of: "c") == nil)
+    }
+}
+
+@MainActor
+struct SatelliteTests {
+    private func makeRegistry() -> ModuleRegistry {
+        ModuleRegistry(defaults: UserDefaults(suiteName: "notchi.tests.\(UUID().uuidString)")!)
+    }
+
+    @Test func runnersUpBecomeCandidatesButToastsDont() {
+        let registry = makeRegistry()
+        registry.register(TestModule(id: "clock", priority: .active))
+        registry.register(TestModule(id: "media", priority: .ambient))
+        registry.register(TestModule(id: "system", priority: .transient))
+        #expect(registry.foreground?.id == "system")
+        #expect(registry.primary?.id == "clock")
+        #expect(registry.satelliteCandidates.map(\.id) == ["media"])
+    }
+
+    @Test func preferredModuleKeepsTheMiddleUntilSomethingUrgent() {
+        let registry = makeRegistry()
+        let clock = TestModule(id: "clock", priority: .active)
+        registry.register(clock)
+        registry.register(TestModule(id: "media", priority: .ambient))
+        registry.preferredID = "media"
+        #expect(registry.primary?.id == "media")
+
+        clock.liveActivity = LiveActivity(priority: .urgent)
+        #expect(registry.primary?.id == "clock")
+    }
+
+    @Test func clickingABubbleSwapsItIntoTheMiddle() async {
+        let registry = makeRegistry()
+        let clock = TestModule(id: "clock", priority: .active)
+        registry.register(clock)
+        registry.register(TestModule(id: "media", priority: .active))
+        let model = NotchViewModel(geometry: .previewNotch, registry: registry)
+        #expect(model.state == .compact)
+        #expect(registry.foreground?.id == "clock")
+        #expect(model.visibleSatellites.map(\.module.id) == ["media"])
+        #expect(model.satellites.trailing == "media")
+
+        model.bringToFront("media")
+        #expect(registry.foreground?.id == "media")
+        #expect(model.swapCount == 1)
+        // The clicked bubble merges in first; the replaced activity squeezes out into its slot a beat later.
+        #expect(model.satellites.trailing == nil)
+        try? await Task.sleep(for: Motion.swapBeat * 3)
+        #expect(model.satellites.trailing == "clock")
+
+        // The pick ends with its activity, and the bubble merges back into the middle.
+        (registry.module(withID: "media") as? TestModule)?.liveActivity = nil
+        await Task.yield()
+        await Task.yield()
+        #expect(registry.preferredID == nil)
+        #expect(registry.foreground?.id == "clock")
+        #expect(model.visibleSatellites.isEmpty)
+    }
+
+    @Test func bubblesHideWhileExpanded() {
+        let registry = makeRegistry()
+        registry.register(TestModule(id: "clock", priority: .active))
+        registry.register(TestModule(id: "media", priority: .active))
+        let model = NotchViewModel(geometry: .previewIsland, registry: registry)
+        model.expandNow()
+        #expect(model.visibleSatellites.isEmpty)
+        model.collapse()
+        #expect(model.visibleSatellites.map(\.side) == [.trailing])
+    }
+
+    @Test func bubblesSitClearOfTheSurfaceInsideThePanel() {
+        for geometry in [NotchGeometry.previewNotch, .previewIsland] {
+            let layout = NotchLayout.make(state: .compact, geometry: geometry, sideWidth: Metrics.maxCompactSideWidth, topCurve: Metrics.Notch.topCurveRange.upperBound)
+            let surface = layout.hitRect(in: geometry)
+            let panel = NotchLayout.panelFrame(in: geometry)
+            for side in SatelliteSide.allCases {
+                let bubble = layout.satelliteHitRect(side, in: geometry)
+                #expect(!bubble.intersects(surface))
+                #expect(panel.contains(bubble))
+                #expect(bubble.maxY <= geometry.screenFrame.maxY)
+            }
+        }
+    }
+}
+
 @MainActor
 @Observable
 private final class TestModule: NotchModule {

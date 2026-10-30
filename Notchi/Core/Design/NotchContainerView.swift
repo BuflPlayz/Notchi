@@ -25,6 +25,30 @@ struct NotchContainerView: View {
         let layout = model.layout
         let shape = NotchShape(style: model.geometry.style, topRadius: layout.topRadius, bottomRadius: layout.bottomRadius)
 
+        ZStack(alignment: .top) {
+            surface(layout: layout, shape: shape)
+                .padding(.top, layout.topInset)
+            satellites(layout: layout)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea()
+        .environment(\.notchNamespace, reduceMotion ? nil : namespace)
+        .environment(\.colorScheme, .dark)
+        .onReceive(NotificationCenter.default.publisher(for: .notchiOpenSettings)) { _ in
+            model.collapse()
+            NSApp.activate()
+            openSettings()
+        }
+        .contextMenu {
+            Button("Settings…") {
+                NotificationCenter.default.post(name: .notchiOpenSettings, object: nil)
+            }
+            Divider()
+            Button("Quit Notchi") { NSApp.terminate(nil) }
+        }
+    }
+
+    private func surface(layout: NotchLayout, shape: NotchShape) -> some View {
         content(layout: layout)
             .frame(width: layout.size.width, height: layout.size.height, alignment: .top)
             .background {
@@ -38,30 +62,33 @@ struct NotchContainerView: View {
             }
             .clipShape(shape)
             .overlay { NotchRim(shape: shape, style: model.geometry.style, brightness: rimBrightness) }
+            .swapPulse(trigger: reduceMotion ? 0 : model.swapCount)
             .contentShape(shape)
             .shadow(color: .black.opacity(islandShadowOpacity), radius: 18, y: 8)
             .opacity(isHiddenAtRest ? 0 : 1)
             .animation(Motion.content, value: isHiddenAtRest)
-            .padding(.top, layout.topInset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .ignoresSafeArea()
-            .environment(\.notchNamespace, reduceMotion ? nil : namespace)
-            .environment(\.colorScheme, .dark)
+            // Only the surface opens the panel; the bubbles beside it swap instead.
             .simultaneousGesture(TapGesture().onEnded {
                 if model.state != .expanded { model.expandNow() }
             })
-            .onReceive(NotificationCenter.default.publisher(for: .notchiOpenSettings)) { _ in
-                model.collapse()
-                NSApp.activate()
-                openSettings()
+    }
+
+    /// Other live activities, in detached bubbles either side of the compact surface.
+    private func satellites(layout: NotchLayout) -> some View {
+        ForEach(model.visibleSatellites, id: \.module.id) { satellite in
+            SatelliteBubble(module: satellite.module, diameter: layout.satelliteDiameter) {
+                model.bringToFront(satellite.module.id)
             }
-            .contextMenu {
-                Button("Settings…") {
-                    NotificationCenter.default.post(name: .notchiOpenSettings, object: nil)
-                }
-                Divider()
-                Button("Quit Notchi") { NSApp.terminate(nil) }
-            }
+            // Placed with padding, not an offset: the warp's stretch anchors on the layout frame,
+            // which has to be the bubble's own.
+            .padding(satellite.side == .leading ? .trailing : .leading, 2 * layout.satelliteCenterOffset)
+            .padding(.top, layout.satelliteTop)
+            .transition(Motion.satelliteTransition(
+                side: satellite.side,
+                travel: Metrics.Satellite.gap + layout.satelliteDiameter * Metrics.Satellite.absorbTravel,
+                reduceMotion: reduceMotion
+            ))
+        }
     }
 
     @ViewBuilder

@@ -29,6 +29,35 @@ enum Motion {
         reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)
     }
 
+    /// Swapping a bubble into the middle: quick, with a little give, like the Dynamic Island.
+    static var swap: Animation {
+        reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.38, dampingFraction: 0.8)
+    }
+
+    /// A bubble being absorbed into the surface: quick, no overshoot.
+    static var satelliteAbsorb: Animation {
+        reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.28, dampingFraction: 0.95)
+    }
+
+    /// A bubble squeezed out of the surface: overshoots, so it wobbles as it pops free.
+    static var satelliteEmerge: Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.62)
+    }
+
+    /// How long a swap waits between absorbing the clicked bubble and squeezing out the one it replaces.
+    static let swapBeat: Duration = .milliseconds(120)
+
+    /// A bubble beside the notch merges into the surface and squeezes back out of it. Reduce Motion
+    /// fades in place. Timing comes from the caller (`satelliteAbsorb`, `satelliteEmerge`): an
+    /// animation attached to this transition held insertions back until removals had finished.
+    static func satelliteTransition(side: SatelliteSide, travel: CGFloat, reduceMotion: Bool) -> AnyTransition {
+        if reduceMotion { return .opacity }
+        return .modifier(
+            active: SatelliteWarp(side: side, travel: travel, progress: 1),
+            identity: SatelliteWarp(side: side, travel: travel, progress: 0)
+        )
+    }
+
     /// How compact and expanded content appear. Blur-in normally, plain fade with Reduce Motion.
     static func contentTransition(reduceMotion: Bool) -> AnyTransition {
         reduceMotion ? .opacity : AnyTransition(.blurReplace).combined(with: .scale(scale: 0.92, anchor: .top))

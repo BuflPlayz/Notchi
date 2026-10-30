@@ -3,8 +3,9 @@ import SwiftUI
 /// Told about transitions so hover hit-testing and click-away follow the shape.
 @MainActor
 protocol NotchViewModelDelegate: AnyObject {
-    /// Called right before an animated change to `state` and `layout`.
-    func notchWillTransition(to state: NotchState, layout: NotchLayout)
+    /// Called right before an animated change to `state`, `layout` or the bubbles. `satellites` are
+    /// the sides that will show a bubble.
+    func notchWillTransition(to state: NotchState, layout: NotchLayout, satellites: [SatelliteSide])
     /// The main display changed; the panel needs re-placing.
     func notchGeometryDidChange()
     /// Full-screen hiding turned on or off; hover and clicks follow.
@@ -25,11 +26,18 @@ final class NotchViewModel {
     /// True while a full-screen app is in front (and "Hide in full screen" is on): the notch stays
     /// out of the way except for activities that opt in, and hover is ignored.
     private(set) var isSuppressed = false
+    /// Other live activities, as bubbles either side of the compact notch.
+    private(set) var satellites = SatelliteSlots()
+    /// Bumped by every swap, so the surface plays its warp toward `lastSwapSide`.
+    private(set) var swapCount = 0
+    private(set) var lastSwapSide = SatelliteSide.trailing
 
     let registry: ModuleRegistry
     @ObservationIgnored weak var delegate: NotchViewModelDelegate?
 
     @ObservationIgnored private var expandRequested = false
+    /// Squeezes out the replaced activity's bubble once the clicked one has been absorbed.
+    @ObservationIgnored private var swapTask: Task<Void, Never>?
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var preferencesObserver: NSObjectProtocol?
     /// While a size or appearance slider moves in Settings, the notch shows the state it applies to.
@@ -52,6 +60,23 @@ final class NotchViewModel {
 
     var selectedModule: (any NotchModule)? {
         selectedModuleID.flatMap(registry.module(withID:)) ?? registry.foreground ?? registry.modules.first
+    }
+
+    /// One bubble beside the notch.
+    struct Satellite {
+        let side: SatelliteSide
+        let module: any NotchModule
+    }
+
+    /// The bubbles on screen: only beside the compact notch, and never over a full-screen app.
+    var visibleSatellites: [Satellite] {
+        Self.visibleSides(state: state, satellites: satellites, suppressed: isSuppressed).compactMap { side in
+            satellites[side].flatMap(registry.module(withID:)).map { Satellite(side: side, module: $0) }
+        }
+    }
+
+    private static func visibleSides(state: NotchState, satellites: SatelliteSlots, suppressed: Bool) -> [SatelliteSide] {
+        state == .compact && !suppressed ? satellites.occupied : []
     }
 
     // MARK: Inputs
@@ -95,6 +120,47 @@ final class NotchViewModel {
         setExpandRequested(false)
     }
 
+    /// Click on a bubble: its activity swaps places with the one in the middle, and the one it
+    /// replaces takes the bubble's slot.
+    func bringToFront(_ id: String) {
+        guard state == .compact, !isSuppressed, let side = satellites.side(of: id), let current = registry.primary?.id else { return }
+        let previousPreference = registry.preferredID
+        registry.preferredID = id
+        // Something more pressing (an urgent timer) keeps the middle; nothing moves.
+        guard registry.primary?.id == id else {
+            registry.preferredID = previousPreference
+            return
+        }
+        var swapped = satellites
+        swapped[side] = current
+        let newLayout = targetLayout(for: state)
+        delegate?.notchWillTransition(
+            to: state,
+            layout: newLayout,
+            satellites: Self.visibleSides(state: state, satellites: swapped, suppressed: isSuppressed)
+        )
+        // First the clicked bubble merges into the notch, as the notch gulps and changes content…
+        var absorbed = satellites
+        absorbed[side] = nil
+        lastSwapSide = side
+        withAnimation(Motion.swap) {
+            swapCount += 1
+            layout = newLayout
+        }
+        withAnimation(Motion.satelliteAbsorb) { satellites = absorbed }
+        // …then, a beat later, the activity it replaced squeezes out into the same slot.
+        swapTask?.cancel()
+        swapTask = Task { [weak self] in
+            try? await Task.sleep(for: Motion.swapBeat)
+            guard let self, !Task.isCancelled else { return }
+            self.swapTask = nil
+            if self.satellites[side] == nil, self.registry.satelliteCandidates.contains(where: { $0.id == current }) {
+                withAnimation(Motion.satelliteEmerge) { self.satellites[side] = current }
+            }
+            self.reevaluate()
+        }
+    }
+
     /// The main display changed (plugged in, lid closed, resolution). Snap, don't animate.
     func updateGeometry(_ newGeometry: NotchGeometry) {
         guard newGeometry != geometry else { return }
@@ -112,29 +178,46 @@ final class NotchViewModel {
     }
 
     private func reevaluate() {
+        // A pick lasts as long as its activity; next time, the usual priorities decide again.
+        if let preferred = registry.preferredID, registry.module(withID: preferred)?.liveActivity == nil {
+            registry.preferredID = nil
+        }
         let activity = registry.foreground?.liveActivity
         // In full screen only opted-in activities (the volume HUD) may show, and never expanded.
         let visibleActivity = isSuppressed ? activity.flatMap { $0.showsInFullScreen ? $0 : nil } : activity
         var target = NotchState.resolve(expandRequested: expandRequested && !isSuppressed, hasLiveActivity: visibleActivity != nil)
         if let sizePreview, sizePreview.rank > target.rank, !isSuppressed { target = sizePreview }
         let newLayout = targetLayout(for: target)
-        guard target != state || newLayout != layout else { return }
-        transition(to: target, layout: newLayout)
+        // Mid-swap the slots are the swap's to manage; it re-evaluates when it's done.
+        let newSatellites = swapTask == nil ? satellites.reconciled(with: registry.satelliteCandidates.map(\.id)) : satellites
+        guard target != state || newLayout != layout || newSatellites != satellites else { return }
+        transition(to: target, layout: newLayout, satellites: newSatellites)
     }
 
-    private func transition(to target: NotchState, layout newLayout: NotchLayout) {
+    private func transition(to target: NotchState, layout newLayout: NotchLayout, satellites newSatellites: SatelliteSlots) {
         let opening = target == .expanded && state != .expanded
         if opening {
             if let foreground = registry.foreground?.id { selectedModuleID = foreground }
             Haptics.expand()
         }
 
-        delegate?.notchWillTransition(to: target, layout: newLayout)
+        delegate?.notchWillTransition(
+            to: target,
+            layout: newLayout,
+            satellites: Self.visibleSides(state: target, satellites: newSatellites, suppressed: isSuppressed)
+        )
 
         let growing = newLayout.size.height > layout.size.height
         withAnimation(growing ? Motion.expand : Motion.collapse) {
             state = target
             layout = newLayout
+        }
+        // New bubbles pop out of the notch with a wobble; leaving ones merge back in cleanly.
+        let addsBubble = newSatellites.occupied.contains { side in
+            newSatellites[side].map { satellites.side(of: $0) == nil } == true
+        }
+        withAnimation(addsBubble ? Motion.satelliteEmerge : Motion.satelliteAbsorb) {
+            satellites = newSatellites
         }
     }
 
@@ -220,6 +303,7 @@ final class NotchViewModel {
     private func observeRegistry() {
         withObservationTracking {
             _ = registry.foreground?.liveActivity
+            _ = registry.satelliteCandidates.map(\.liveActivity)
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.reevaluate()
@@ -235,5 +319,6 @@ final class NotchViewModel {
         expandRequested = newState == .expanded
         state = newState
         layout = targetLayout(for: newState)
+        satellites = satellites.reconciled(with: registry.satelliteCandidates.map(\.id))
     }
 }

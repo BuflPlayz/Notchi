@@ -55,6 +55,16 @@ enum Metrics {
         static let topCurveRange: ClosedRange<CGFloat> = 0...28
     }
 
+    /// Round bubbles beside the compact surface, one per extra live activity.
+    enum Satellite {
+        /// Clear space between a bubble and the surface's side, so it reads as detached.
+        static let gap: CGFloat = 7
+        /// Notch style: space above and below a bubble within the notch's height.
+        static let notchInset: CGFloat = 2
+        /// How far past the surface's side a bubble travels as it's absorbed, as a share of its diameter.
+        static let absorbTravel: CGFloat = 1.1
+    }
+
     /// Dynamic Island style (main display without a notch).
     enum Island {
         static let idleWidth: CGFloat = 120

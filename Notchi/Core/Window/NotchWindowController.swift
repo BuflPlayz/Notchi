@@ -39,9 +39,9 @@ final class NotchWindowController: NotchViewModelDelegate {
 
     // MARK: NotchViewModelDelegate
 
-    func notchWillTransition(to state: NotchState, layout: NotchLayout) {
+    func notchWillTransition(to state: NotchState, layout: NotchLayout, satellites: [SatelliteSide]) {
         // Hit-test against where the shape is going, so the area it's leaving stops counting at once.
-        hover.setHitRect(hitRect(for: layout))
+        updateHitRects(layout: layout, satellites: satellites)
         if state == .expanded { installClickAwayMonitor() } else { removeClickAwayMonitor() }
     }
 
@@ -50,20 +50,28 @@ final class NotchWindowController: NotchViewModelDelegate {
     }
 
     func notchSuppressionDidChange() {
-        hover.setHitRect(hitRect(for: model.layout))
+        updateHitRects(layout: model.layout, satellites: model.visibleSatellites.map(\.side))
         if model.isSuppressed { removeClickAwayMonitor() }
     }
 
     /// Nothing is interactive while hidden for a full-screen app: the top edge belongs to its menu bar.
-    private func hitRect(for layout: NotchLayout) -> CGRect {
-        model.isSuppressed ? .zero : layout.hitRect(in: model.geometry)
+    /// The bubbles take clicks but don't open the notch on hover.
+    private func updateHitRects(layout: NotchLayout, satellites: [SatelliteSide]) {
+        guard !model.isSuppressed else {
+            hover.setHitRect(.zero)
+            return
+        }
+        hover.setHitRect(
+            layout.hitRect(in: model.geometry),
+            clickable: satellites.map { layout.satelliteHitRect($0, in: model.geometry) }
+        )
     }
 
     // MARK: Private
 
     private func placePanel() {
         panel.setFrame(NotchLayout.panelFrame(in: model.geometry), display: true)
-        hover.setHitRect(hitRect(for: model.layout))
+        updateHitRects(layout: model.layout, satellites: model.visibleSatellites.map(\.side))
     }
 
     /// Clicks in other apps collapse the panel. Clicks outside the shape fall through to those apps,

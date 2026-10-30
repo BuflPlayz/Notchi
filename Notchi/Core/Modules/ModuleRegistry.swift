@@ -36,9 +36,50 @@ final class ModuleRegistry {
         modules.first { $0.id == id }
     }
 
-    /// The module whose live activity fills the compact slots: highest priority wins,
-    /// ties go to the earlier module. Reading this tracks every enabled module's activity.
+    /// The module the user brought into the middle by clicking its bubble. It keeps the middle while
+    /// its activity lasts, unless another one becomes `urgent`; toasts still show over it.
+    var preferredID: String?
+
+    /// The module whose live activity fills the compact slots: a toast if one is showing, otherwise
+    /// `primary`. Reading this tracks every enabled module's activity.
     var foreground: (any NotchModule)? {
+        Self.highestPriority(in: modules.filter { $0.liveActivity?.priority == .transient }) ?? primary
+    }
+
+    /// The module in the middle when no toast is showing: the user's pick, unless something more
+    /// pressing than "running" comes along; otherwise the highest priority, ties to the earlier module.
+    var primary: (any NotchModule)? {
+        let candidates = modules.filter { Self.isLasting($0) }
+        guard let best = Self.highestPriority(in: candidates), let bestPriority = best.liveActivity?.priority else { return nil }
+        if let preferred = candidates.first(where: { $0.id == preferredID }),
+           let preferredPriority = preferred.liveActivity?.priority,
+           bestPriority <= max(preferredPriority, .active) {
+            return preferred
+        }
+        return best
+    }
+
+    /// Lasting activities that aren't `primary`, most important first: the bubbles beside the notch.
+    /// Toasts never become bubbles; they come and go in the middle.
+    var satelliteCandidates: [any NotchModule] {
+        let primaryID = primary?.id
+        return modules.enumerated()
+            .filter { Self.isLasting($0.element) && $0.element.id != primaryID }
+            .sorted { lhs, rhs in
+                let left = lhs.element.liveActivity?.priority ?? .ambient
+                let right = rhs.element.liveActivity?.priority ?? .ambient
+                return left != right ? left > right : lhs.offset < rhs.offset
+            }
+            .map(\.element)
+    }
+
+    private static func isLasting(_ module: any NotchModule) -> Bool {
+        guard let priority = module.liveActivity?.priority else { return false }
+        return priority != .transient
+    }
+
+    /// Highest priority wins; ties go to the earlier module.
+    private static func highestPriority(in modules: [any NotchModule]) -> (any NotchModule)? {
         var winner: (module: any NotchModule, priority: LiveActivity.Priority)?
         for module in modules {
             guard let priority = module.liveActivity?.priority else { continue }
