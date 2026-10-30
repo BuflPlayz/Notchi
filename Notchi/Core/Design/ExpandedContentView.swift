@@ -14,6 +14,7 @@ struct ExpandedContentView: View {
             if model.isDragging, let dropHandler = model.dropHandler {
                 dropHandler.dropView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .environment(\.notchDropFinished, model.dropFinished)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             } else if let module = model.selectedModule {
                 module.expandedView()

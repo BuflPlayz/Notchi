@@ -46,6 +46,11 @@ protocol NotchDropHandler: NotchModule {
     func dropView() -> AnyView
 }
 
+extension EnvironmentValues {
+    /// Called by a drop view once it has taken a drop, so the panel leaves drop mode right away.
+    @Entry var notchDropFinished: @MainActor () -> Void = {}
+}
+
 extension NotchModule {
     func compactMinimal() -> AnyView { compactLeading() }
     func compactBelow() -> AnyView? { nil }

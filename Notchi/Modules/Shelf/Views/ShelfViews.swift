@@ -155,8 +155,9 @@ private struct DropZone: View {
     let symbol: String
     let title: String
     let subtitle: String
-    let perform: ([NSItemProvider]) -> Void
+    let perform: ([ShelfDropLoader.Loaded]) -> Void
     @State private var isTargeted = false
+    @Environment(\.notchDropFinished) private var dropFinished
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -178,9 +179,51 @@ private struct DropZone: View {
         }
         .scaleEffect(isTargeted ? 1.03 : 1)
         .animation(Motion.content, value: isTargeted)
-        .onDrop(of: ShelfDropLoader.acceptedTypes, isTargeted: $isTargeted) { providers in
-            perform(providers)
-            return true
+        .overlay {
+            PasteboardDropTarget(isTargeted: $isTargeted) { pasteboard in
+                let items = ShelfDropLoader.items(from: pasteboard)
+                guard !items.isEmpty else { return false }
+                perform(items)
+                dropFinished()
+                return true
+            }
+        }
+    }
+}
+
+/// An AppKit drop target, so drops are read off the pasteboard the moment they land (see
+/// `ShelfDropLoader` for why not SwiftUI's `onDrop`).
+private struct PasteboardDropTarget: NSViewRepresentable {
+    @Binding var isTargeted: Bool
+    let onDrop: (NSPasteboard) -> Bool
+
+    func makeNSView(context: Context) -> TargetView {
+        let view = TargetView()
+        view.registerForDraggedTypes(ShelfDropLoader.acceptedTypes)
+        return view
+    }
+
+    func updateNSView(_ view: TargetView, context: Context) {
+        view.onTargetChange = { targeted in isTargeted = targeted }
+        view.onDrop = onDrop
+    }
+
+    final class TargetView: NSView {
+        var onTargetChange: ((Bool) -> Void)?
+        var onDrop: ((NSPasteboard) -> Bool)?
+
+        override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+            onTargetChange?(true)
+            return .copy
+        }
+
+        override func draggingExited(_ sender: NSDraggingInfo?) {
+            onTargetChange?(false)
+        }
+
+        override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+            onTargetChange?(false)
+            return onDrop?(sender.draggingPasteboard) ?? false
         }
     }
 }

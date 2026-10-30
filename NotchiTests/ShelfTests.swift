@@ -57,21 +57,40 @@ struct ShelfTests {
         #expect(relaunched.items.map(\.url) == [kept])
     }
 
-    @Test func loaderPrefersFilesThenImagesThenLinksThenText() async throws {
-        let file = try makeFile()
-        #expect(await ShelfDropLoader.load(NSItemProvider(contentsOf: file)!) == .file(file))
+    private func pasteboard(_ fill: (NSPasteboard) -> Void) -> NSPasteboard {
+        let pasteboard = NSPasteboard(name: .init("notchi.tests.\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        fill(pasteboard)
+        return pasteboard
+    }
 
-        let link = NSItemProvider(object: URL(string: "https://example.com/page")! as NSURL)
-        guard case .data(let plist, let name)? = await ShelfDropLoader.load(link) else {
+    @Test func loaderReadsFilesAsThemselves() throws {
+        let files = [try makeFile("One.txt"), try makeFile("Two.txt")]
+        let dropped = ShelfDropLoader.items(from: pasteboard { $0.writeObjects(files as [NSURL]) })
+        #expect(dropped == files.map(ShelfDropLoader.Loaded.file))
+    }
+
+    @Test func loaderPrefersAnImageOverItsLink() {
+        let png = Data([0x89, 0x50, 0x4E, 0x47])
+        let dropped = ShelfDropLoader.items(from: pasteboard {
+            $0.setData(png, forType: .png)
+            $0.setString("https://example.com/photos/cat.png", forType: .URL)
+        })
+        #expect(dropped == [.data(png, name: "cat.png")])
+    }
+
+    @Test func loaderSavesLinksAsWeblocAndTextAsTxt() throws {
+        let link = ShelfDropLoader.items(from: pasteboard { $0.writeObjects([URL(string: "https://example.com/page")! as NSURL]) })
+        guard case .data(let plist, let name)? = link.first else {
             Issue.record("A link should become a .webloc")
             return
         }
-        #expect(name.hasSuffix(".webloc"))
+        #expect(name == "example.com.webloc")
         let dictionary = try PropertyListSerialization.propertyList(from: plist, format: nil) as? [String: String]
         #expect(dictionary?["URL"] == "https://example.com/page")
 
-        let text = NSItemProvider(object: "Remember this" as NSString)
-        #expect(await ShelfDropLoader.load(text) == .data(Data("Remember this".utf8), name: "Text.txt"))
+        let text = ShelfDropLoader.items(from: pasteboard { $0.setString("Remember this", forType: .string) })
+        #expect(text == [.data(Data("Remember this".utf8), name: "Text.txt")])
     }
 
     @Test func fileNamesAreSafeAndHaveExtensions() {

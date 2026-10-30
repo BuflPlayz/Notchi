@@ -82,34 +82,26 @@ final class ShelfModule: NotchModule, NotchDropHandler {
     // MARK: Drops
 
     /// Keeps everything dropped on the Shelf zone.
-    func store(_ providers: [NSItemProvider]) {
-        Task {
-            for provider in providers {
-                switch await ShelfDropLoader.load(provider) {
-                case .file(let url): add(fileAt: url)
-                case .data(let data, let name): _ = try? add(data: data, named: name)
-                case nil: break
-                }
+    func store(_ dropped: [ShelfDropLoader.Loaded]) {
+        for item in dropped {
+            switch item {
+            case .file(let url): add(fileAt: url)
+            case .data(let data, let name): _ = try? add(data: data, named: name)
             }
         }
     }
 
     /// Opens the share menu for everything dropped on the Share zone. Things that weren't files are
     /// written to a temporary folder first, since sharing services take files.
-    func share(_ providers: [NSItemProvider]) {
-        Task {
-            var urls: [URL] = []
-            for provider in providers {
-                switch await ShelfDropLoader.load(provider) {
-                case .file(let url): urls.append(url)
-                case .data(let data, let name):
-                    let folder = URL.temporaryDirectory.appending(path: "Notchi Share", directoryHint: .isDirectory)
-                    if let url = try? write(data, named: name, in: folder) { urls.append(url) }
-                case nil: break
-                }
+    func share(_ dropped: [ShelfDropLoader.Loaded]) {
+        let folder = URL.temporaryDirectory.appending(path: "Notchi Share", directoryHint: .isDirectory)
+        let urls = dropped.compactMap { item -> URL? in
+            switch item {
+            case .file(let url): url
+            case .data(let data, let name): try? write(data, named: name, in: folder)
             }
-            Self.presentSharing(urls)
         }
+        Self.presentSharing(urls)
     }
 
     /// The share menu, at the cursor, anchored to the notch's panel.

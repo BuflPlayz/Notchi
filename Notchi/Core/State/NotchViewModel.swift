@@ -43,6 +43,7 @@ final class NotchViewModel {
     @ObservationIgnored private var expandRequested = false
     /// Squeezes out the replaced activity's bubble once the clicked one has been absorbed.
     @ObservationIgnored private var swapTask: Task<Void, Never>?
+    @ObservationIgnored private var dragEndTask: Task<Void, Never>?
     /// Reopens the notch once the close before it has played.
     @ObservationIgnored private var reopenTask: Task<Void, Never>?
     /// The module compact mode last showed, and whether that was a toast. A toast arriving over
@@ -124,9 +125,28 @@ final class NotchViewModel {
     }
 
     /// A drag started or ended anywhere on screen.
+    ///
+    /// The mouse-up that ends a drag can arrive before AppKit hands the drop to the panel, so the
+    /// drop targets stay a moment longer. A drop that lands ends them at once (`dropFinished`).
     func setDragging(_ dragging: Bool) {
+        dragEndTask?.cancel()
         guard dragging != isDragging else { return }
-        withAnimation(Motion.content) { isDragging = dragging }
+        if dragging {
+            withAnimation(Motion.content) { isDragging = true }
+            return
+        }
+        dragEndTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            self?.dropFinished()
+        }
+    }
+
+    /// Something was dropped on the notch (or the drag ended elsewhere): back to the module's page.
+    func dropFinished() {
+        dragEndTask?.cancel()
+        guard isDragging else { return }
+        withAnimation(Motion.content) { isDragging = false }
     }
 
     /// Hides or shows the notch for full-screen apps.
