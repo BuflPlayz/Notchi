@@ -20,7 +20,7 @@ enum SystemToast: Equatable, Sendable {
     /// Compact slot width the toast needs.
     var sideWidth: CGFloat {
         switch self {
-        case .volume, .brightness: 64
+        case .volume, .brightness: 80
         case .charging, .lowBattery, .focus: 46
         }
     }

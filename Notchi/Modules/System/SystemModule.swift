@@ -204,8 +204,20 @@ final class SystemModule: NotchModule {
     /// every key press, extending its time.
     private func show(_ newToast: SystemToast, force: Bool = false) {
         guard force || newToast != toast else { return }
-        toast = newToast
-        liveActivity = LiveActivity(priority: .transient, sideWidth: max(Preferences.compactSideWidth, newToast.sideWidth))
+        let isHUD = newToast.kind == .volume || newToast.kind == .brightness
+        if newToast.isSameKind(as: toast) {
+            // One spring for the whole update, so the bar, the rolling digits and the icon move
+            // together, and a held key retargets smoothly instead of stepping.
+            withAnimation(Motion.hud) { toast = newToast }
+        } else {
+            toast = newToast
+        }
+        let activity = LiveActivity(
+            priority: .transient,
+            sideWidth: max(Preferences.compactSideWidth, newToast.sideWidth),
+            showsInFullScreen: isHUD
+        )
+        if liveActivity != activity { liveActivity = activity }
         toastTask?.cancel()
         let duration = newToast.duration
         toastTask = Task { [weak self] in

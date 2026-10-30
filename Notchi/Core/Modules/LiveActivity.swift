@@ -20,4 +20,7 @@ struct LiveActivity: Equatable, Sendable {
     /// Width of each compact slot. `nil` uses the user's "Live activity width" setting;
     /// modules whose content can't fit (a timer readout) can ask for a specific width.
     var sideWidth: CGFloat? = nil
+    /// Still show while a full-screen app hides the notch. Only for feedback the user just asked
+    /// for, like the volume HUD, since the system's own HUD is suppressed.
+    var showsInFullScreen = false
 }

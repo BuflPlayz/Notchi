@@ -7,6 +7,8 @@ protocol NotchViewModelDelegate: AnyObject {
     func notchWillTransition(to state: NotchState, layout: NotchLayout)
     /// The main display changed; the panel needs re-placing.
     func notchGeometryDidChange()
+    /// Full-screen hiding turned on or off; hover and clicks follow.
+    func notchSuppressionDidChange()
 }
 
 /// The notch's state machine. Inputs are hover/click intent and the modules' live activities;
@@ -20,6 +22,9 @@ final class NotchViewModel {
     private(set) var layout: NotchLayout
     /// Module shown in the expanded panel.
     var selectedModuleID: String?
+    /// True while a full-screen app is in front (and "Hide in full screen" is on): the notch stays
+    /// out of the way except for activities that opt in, and hover is ignored.
+    private(set) var isSuppressed = false
 
     let registry: ModuleRegistry
     @ObservationIgnored weak var delegate: NotchViewModelDelegate?
@@ -50,6 +55,7 @@ final class NotchViewModel {
     /// Cursor entered or left the notch. Debounced so a passing cursor doesn't open it.
     func hoverChanged(isInside: Bool) {
         hoverTask?.cancel()
+        if isSuppressed { return }
         // Leaving cancels a pending expand right away; there's nothing to wait for if we're not expanded.
         if !isInside && !expandRequested { return }
         // With "Open on hover" off, only a click opens; moving away still closes.
@@ -62,8 +68,19 @@ final class NotchViewModel {
         }
     }
 
+    /// Hides or shows the notch for full-screen apps.
+    func setSuppressed(_ suppressed: Bool) {
+        guard suppressed != isSuppressed else { return }
+        isSuppressed = suppressed
+        hoverTask?.cancel()
+        if suppressed { expandRequested = false }
+        delegate?.notchSuppressionDidChange()
+        reevaluate()
+    }
+
     /// Click on the notch: open without waiting for the hover delay.
     func expandNow() {
+        guard !isSuppressed else { return }
         hoverTask?.cancel()
         setExpandRequested(true)
     }
@@ -91,8 +108,11 @@ final class NotchViewModel {
     }
 
     private func reevaluate() {
-        var target = NotchState.resolve(expandRequested: expandRequested, hasLiveActivity: registry.foreground != nil)
-        if let sizePreview, sizePreview.rank > target.rank { target = sizePreview }
+        let activity = registry.foreground?.liveActivity
+        // In full screen only opted-in activities (the volume HUD) may show, and never expanded.
+        let visibleActivity = isSuppressed ? activity.flatMap { $0.showsInFullScreen ? $0 : nil } : activity
+        var target = NotchState.resolve(expandRequested: expandRequested && !isSuppressed, hasLiveActivity: visibleActivity != nil)
+        if let sizePreview, sizePreview.rank > target.rank, !isSuppressed { target = sizePreview }
         let newLayout = targetLayout(for: target)
         guard target != state || newLayout != layout else { return }
         transition(to: target, layout: newLayout)

@@ -41,7 +41,7 @@ final class NotchWindowController: NotchViewModelDelegate {
 
     func notchWillTransition(to state: NotchState, layout: NotchLayout) {
         // Hit-test against where the shape is going, so the area it's leaving stops counting at once.
-        hover.setHitRect(layout.hitRect(in: model.geometry))
+        hover.setHitRect(hitRect(for: layout))
         if state == .expanded { installClickAwayMonitor() } else { removeClickAwayMonitor() }
     }
 
@@ -49,11 +49,21 @@ final class NotchWindowController: NotchViewModelDelegate {
         placePanel()
     }
 
+    func notchSuppressionDidChange() {
+        hover.setHitRect(hitRect(for: model.layout))
+        if model.isSuppressed { removeClickAwayMonitor() }
+    }
+
+    /// Nothing is interactive while hidden for a full-screen app: the top edge belongs to its menu bar.
+    private func hitRect(for layout: NotchLayout) -> CGRect {
+        model.isSuppressed ? .zero : layout.hitRect(in: model.geometry)
+    }
+
     // MARK: Private
 
     private func placePanel() {
         panel.setFrame(NotchLayout.panelFrame(in: model.geometry), display: true)
-        hover.setHitRect(model.layout.hitRect(in: model.geometry))
+        hover.setHitRect(hitRect(for: model.layout))
     }
 
     /// Clicks in other apps collapse the panel. Clicks outside the shape fall through to those apps,

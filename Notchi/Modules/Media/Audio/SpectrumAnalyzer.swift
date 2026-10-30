@@ -2,7 +2,8 @@ import Accelerate
 
 /// Turns raw audio into a few smoothed band levels (0…1) for the visualizer.
 ///
-/// 1024-point FFT with 50% overlap and a Hann window. Bands are spaced logarithmically from 60 Hz
+/// A 1024-point FFT with a Hann window over the latest audio, run only when a frame is due
+/// (~30 times a second), not for every buffer. Bands are spaced logarithmically from 60 Hz
 /// to 12 kHz, like hearing. Each band is normalized in dB and then auto-gained against its own
 /// recent peak, so the bars dance at any volume. Not thread-safe: one instance per audio queue.
 final class SpectrumAnalyzer {
@@ -53,17 +54,12 @@ final class SpectrumAnalyzer {
     /// Feeds mono samples. Returns new levels when it's time to publish, otherwise nil.
     func process(_ samples: UnsafeBufferPointer<Float>) -> [Float]? {
         pending.append(contentsOf: samples)
+        // Only the most recent window matters.
+        if pending.count > fftSize { pending.removeFirst(pending.count - fftSize) }
         samplesSinceEmit += samples.count
-        var result: [Float]?
-        while pending.count >= fftSize {
-            let levels = analyzeFrame()
-            pending.removeFirst(fftSize / 2)
-            if samplesSinceEmit >= emitInterval {
-                samplesSinceEmit = 0
-                result = levels
-            }
-        }
-        return result
+        guard samplesSinceEmit >= emitInterval, pending.count == fftSize else { return nil }
+        samplesSinceEmit = 0
+        return analyzeFrame()
     }
 
     private func analyzeFrame() -> [Float] {
@@ -95,11 +91,11 @@ final class SpectrumAnalyzer {
             let level = min(max((decibels + 75) / 60, 0), 1)
 
             // Auto-gain: compare against this band's slowly decaying recent peak.
-            peaks[band] = max(level, peaks[band] * 0.995, 0.3)
+            peaks[band] = max(level, peaks[band] * 0.985, 0.3)
             let target = level < 0.05 ? 0 : min(level / peaks[band], 1)
 
             // Fast attack, slower release, so bars snap up and fall gracefully.
-            let rate: Float = target > smoothed[band] ? 0.6 : 0.25
+            let rate: Float = target > smoothed[band] ? 0.75 : 0.35
             smoothed[band] += (target - smoothed[band]) * rate
         }
         return smoothed

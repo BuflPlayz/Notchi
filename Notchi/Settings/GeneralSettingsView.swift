@@ -11,6 +11,7 @@ struct GeneralSettingsView: View {
     @AppStorage(Preferences.Key.compactSideWidth) private var compactSideWidth = Double(Metrics.compactSideWidth)
     @AppStorage(Preferences.Key.expandedWidth) private var expandedWidth = Double(Metrics.expandedWidth)
     @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = true
+    @AppStorage(Preferences.Key.hideInFullScreen) private var hideInFullScreen = true
 
     @State private var launchAtLogin = LaunchAtLogin.shared
     @State private var isConfirmingReset = false
@@ -38,10 +39,11 @@ struct GeneralSettingsView: View {
                     .disabled(!openOnHover)
                 SettingsSliderRow(title: "Close after", value: $collapseDelay, range: 0...1, step: 0.05, unit: "s", fractionDigits: 2)
                 Toggle("Haptic feedback when opening", isOn: $hapticsEnabled)
+                Toggle("Hide in full screen", isOn: $hideInFullScreen)
             } header: {
                 Text("Opening")
             } footer: {
-                SettingsFootnote("With hover off, click the notch to open it. Moving away or clicking elsewhere closes it either way.")
+                SettingsFootnote("With hover off, click the notch to open it. Moving away or clicking elsewhere closes it either way. In full screen, the notch stays hidden and the top edge is left to the app's menu bar; only the volume and brightness HUD still appears.")
             }
 
             Section {

@@ -16,8 +16,10 @@ struct AudioVisualizerView: View {
 
     var body: some View {
         if let levels, isPlaying, !reduceMotion {
+            // Drawn at the analyzer's ~30 updates a second without an animation: the analyzer
+            // already smooths the levels, and interpolating between updates would keep the panel
+            // redrawing at 120 Hz for as long as music plays.
             bars(levels)
-                .animation(.linear(duration: 0.05), value: levels)
                 .accessibilityHidden(true)
         } else {
             synthetic

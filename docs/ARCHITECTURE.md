@@ -99,6 +99,16 @@ Notchi/
 | Reduce Motion | Springs become a 0.2 s opacity and scale cross-fade. Matched-geometry flights are disabled. |
 | Light/dark | The notch surface stays pure black in both modes, because it must match the hardware. Content is white/secondary on black. The Settings window and the accent follow the system appearance. |
 
+### Full screen (implemented)
+
+While a full-screen app is in front of the notch's display, the notch hides and ignores hover and clicks, so the top edge belongs to the app's revealable menu bar. It returns when you leave full screen. Activities can opt in with `LiveActivity.showsInFullScreen`; only the volume and brightness HUD does, because the system HUD is suppressed. It can be turned off in Settings › General › "Hide in full screen".
+
+Detection (`FullScreenMonitor`), measured on macOS 27.2:
+- `NSApp.currentSystemPresentationOptions` is 0 for other apps' full screen (it only describes the caller).
+- On a notched display, a full-screen window's frame (0, 33, 1512×949) is identical to a zoomed window with a hidden Dock.
+- The menu bar window stays "on screen" in the window list.
+- **What works:** the window server tags full-screen Spaces as type 4 in `CGSCopyManagedDisplaySpaces` (private, SIP-safe, loaded with `dlsym`). The monitor matches the notch's display by UUID (or the shared "Main" entry when Spaces aren't per display) and re-checks only on `activeSpaceDidChangeNotification` and display changes.
+
 ## 4. `NotchModule` protocol (sketch)
 
 ```swift
@@ -151,6 +161,7 @@ Since macOS 15.4, `MediaRemote.framework` only serves callers with an Apple-enti
 **Visualizer: real audio (implemented).**
 - `SystemAudioTap` (macOS 14.2+): a Core Audio process tap on system output (`CATapDescription(stereoGlobalTapButExcludeProcesses: [])`, private, unmuted) inside a private aggregate device. The IO block mixes to mono and feeds `SpectrumAnalyzer`.
 - `SpectrumAnalyzer`: 1024-point FFT from Accelerate, Hann window, 50% overlap, 4 bands spaced logarithmically from 60 Hz to 12 kHz. Levels are in dB, auto-gained per band, with fast attack and slow release, published about 30 times a second.
+- Cost control: the FFT runs only when a frame is due (~30/s), not for every audio buffer. The bars draw at that rate without interpolation, and a dedicated view reads the levels so only the bars re-render.
 - `AudioLevelMonitor` runs the tap **only while music plays**, so the recording indicator and the CPU cost exist only then. If no audio has ever arrived (permission denied or pending), the bars fall back to the synthetic animation.
 - Permission: "System Audio Recording Only" (`NSAudioCaptureUsageDescription` in `Config/Info.plist`, plus the `com.apple.security.device.audio-input` entitlement). It can be turned off under Settings › Media.
 
@@ -188,6 +199,7 @@ All of it lives in `SystemModule`. Toasts are `transient` live activities, so th
 
 Details:
 - **Keys Notchi declines go to the system:** an output without software volume, a brightness controller that can't change the display, and ⌥ alone (the shortcut that opens Sound/Displays settings). ⌥⇧ gives fine steps (1/64), and levels snap to the system's 16-step grid. The tap re-enables itself after `tapDisabledByTimeout`. If Notchi quits, the tap dies with it.
+- **HUD animation:** each update happens inside one `Motion.hud` spring, so the level bar eases, the percentage digits roll (`numericText`), the speaker's waves fill, mute bounces the icon, and the sun turns with brightness. Holding a key retargets the spring instead of stepping.
 - **The volume HUD only shows while Notchi owns the keys.** Without Accessibility the system HUD stays, so you never get two HUDs.
 - **The volume "pop"** plays only if the system setting "Play feedback when volume is changed" is on.
 - **Focus, investigated alternatives:** `INFocusStatusCenter` needs a provisioned entitlement, and `~/Library/DoNotDisturb/DB` is TCC-protected. No `com.apple.donotdisturbd` preference holds state, and no public Darwin notification signals changes. If the user hides the Focus menu bar item entirely, Focus reads as off.

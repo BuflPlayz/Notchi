@@ -17,6 +17,7 @@ enum Preferences {
         static let openOnHover = "openOnHover"
         static let islandVisibleWhenIdle = "islandVisibleWhenIdle"
         static let clockShowsPaused = "clockShowsPaused"
+        static let hideInFullScreen = "hideInFullScreen"
         /// Debug: draw the Dynamic Island even on a notched display. Launch with `-NotchiForceIsland YES`.
         static let forceIsland = "NotchiForceIsland"
     }
@@ -25,7 +26,7 @@ enum Preferences {
     static let allKeys = [
         Key.expandDelay, Key.collapseDelay, Key.hapticsEnabled, Key.compactSideWidth, Key.expandedWidth,
         Key.showAllMediaSources, Key.realAudioVisualizer, Key.replaceSystemHUD, Key.batteryAlerts,
-        Key.focusAlerts, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused,
+        Key.focusAlerts, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen,
     ]
 
     static func registerDefaults() {
@@ -43,6 +44,7 @@ enum Preferences {
             Key.openOnHover: true,
             Key.islandVisibleWhenIdle: true,
             Key.clockShowsPaused: true,
+            Key.hideInFullScreen: true,
             Key.forceIsland: false,
         ])
     }
@@ -68,6 +70,8 @@ enum Preferences {
     static var openOnHover: Bool { value(Key.openOnHover, default: true) }
     /// Island style only: keep the small capsule visible at rest, like iPhone. Off hides it until needed.
     static var islandVisibleWhenIdle: Bool { value(Key.islandVisibleWhenIdle, default: true) }
+    /// Hide the notch while a full-screen app is in front (the volume and brightness HUD still shows).
+    static var hideInFullScreen: Bool { value(Key.hideInFullScreen, default: true) }
     /// Show paused Clock timers and a paused stopwatch in compact mode, not just running ones.
     static var clockShowsPaused: Bool { value(Key.clockShowsPaused, default: true) }
     /// Toasts when a Focus turns on or off (needs Accessibility).

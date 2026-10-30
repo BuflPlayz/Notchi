@@ -70,9 +70,11 @@ struct NotchContainerView: View {
         }
     }
 
-    /// "Show the island at rest" off: the resting capsule is invisible, though hovering its spot still opens it.
+    /// Invisible at rest while a full-screen app is in front, or with "Show the island at rest" off
+    /// (hovering its spot still opens it in that case).
     private var isHiddenAtRest: Bool {
-        model.geometry.style == .island && model.state == .idle && !islandVisibleWhenIdle
+        guard model.state == .idle else { return false }
+        return model.isSuppressed || (model.geometry.style == .island && !islandVisibleWhenIdle)
     }
 
     /// Only the expanded island casts a shadow: it floats over content instead of blending into hardware.

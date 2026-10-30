@@ -10,13 +10,9 @@ struct SystemCompactLeading: View {
         Group {
             switch module.toast {
             case .volume(let level, let isMuted):
-                Image(systemName: VolumeSymbol.name(level: level, isMuted: isMuted), variableValue: isMuted ? 0 : level)
-                    .foregroundStyle(Theme.primary)
-                    .contentTransition(.symbolEffect(.replace))
+                VolumeHUDIcon(level: level, isMuted: isMuted)
             case .brightness(let level):
-                Image(systemName: level < 0.5 ? "sun.min.fill" : "sun.max.fill")
-                    .foregroundStyle(Theme.primary)
-                    .contentTransition(.symbolEffect(.replace))
+                BrightnessHUDIcon(level: level)
             case .charging(let battery):
                 BatteryGlyph(battery: battery)
             case .lowBattery(let battery):
@@ -40,9 +36,9 @@ struct SystemCompactTrailing: View {
         Group {
             switch module.toast {
             case .volume(let level, let isMuted):
-                LevelBar(value: isMuted ? 0 : level)
+                HUDLevel(value: level, isMuted: isMuted)
             case .brightness(let level):
-                LevelBar(value: level)
+                HUDLevel(value: level, isMuted: false)
             case .charging(let battery):
                 Text("\(battery.percent)%").foregroundStyle(.green)
             case .lowBattery(let battery):
@@ -58,22 +54,70 @@ struct SystemCompactTrailing: View {
     }
 }
 
-/// A thin capsule showing 0…1, for the compact HUD.
+/// The HUD's right side: a level bar and the percentage, whose digits roll as it changes.
+/// Animated by the transaction the module updates the toast in (`Motion.hud`).
+struct HUDLevel: View {
+    let value: Double
+    let isMuted: Bool
+
+    private var percent: Int { isMuted ? 0 : Int((min(max(value, 0), 1) * 100).rounded()) }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            LevelBar(value: isMuted ? 0 : value)
+            Text("\(percent)")
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(isMuted ? Theme.tertiary : Theme.primary)
+                .contentTransition(.numericText(value: Double(percent)))
+                .frame(width: 24, alignment: .trailing)
+        }
+        .padding(.trailing, 2)
+    }
+}
+
+/// A thin capsule showing 0…1, with a soft glow at the leading edge of the fill.
 struct LevelBar: View {
     let value: Double
 
     var body: some View {
         GeometryReader { geometry in
+            let clamped = min(max(value, 0), 1)
             ZStack(alignment: .leading) {
                 Capsule().fill(Theme.controlFill)
                 Capsule()
-                    .fill(Theme.primary)
-                    .frame(width: max(geometry.size.width * min(max(value, 0), 1), value > 0 ? 4 : 0))
+                    .fill(LinearGradient(colors: [Theme.primary.opacity(0.75), Theme.primary], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: clamped > 0 ? max(geometry.size.width * clamped, geometry.size.height) : 0)
+                    .shadow(color: Theme.primary.opacity(0.35), radius: 3)
             }
         }
-        .frame(height: 4)
-        .padding(.horizontal, 4)
-        .animation(.spring(response: 0.2, dampingFraction: 0.9), value: value)
+        .frame(height: 5)
+    }
+}
+
+/// Speaker whose waves fill with the level; bounces when muting or unmuting.
+struct VolumeHUDIcon: View {
+    let level: Double
+    let isMuted: Bool
+
+    var body: some View {
+        Image(systemName: VolumeSymbol.name(level: level, isMuted: isMuted), variableValue: isMuted ? 0 : max(level, 0.001))
+            .foregroundStyle(Theme.primary)
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.bounce, value: isMuted)
+            .frame(width: 22)
+    }
+}
+
+/// Sun that turns as brightness changes, and swaps between its small and large form.
+struct BrightnessHUDIcon: View {
+    let level: Double
+
+    var body: some View {
+        Image(systemName: level < 0.5 ? "sun.min.fill" : "sun.max.fill")
+            .foregroundStyle(Theme.primary)
+            .contentTransition(.symbolEffect(.replace))
+            .rotationEffect(.degrees(level * 90))
+            .frame(width: 22)
     }
 }
 
@@ -261,8 +305,16 @@ struct NotchSlider: View {
 #Preview("Compact toasts") {
     VStack(spacing: 12) {
         HStack(spacing: 20) {
-            Image(systemName: "speaker.wave.3.fill", variableValue: 0.6).foregroundStyle(.white)
-            LevelBar(value: 0.6).frame(width: 56)
+            VolumeHUDIcon(level: 0.6, isMuted: false)
+            HUDLevel(value: 0.6, isMuted: false).frame(width: 76)
+        }
+        HStack(spacing: 20) {
+            BrightnessHUDIcon(level: 0.3)
+            HUDLevel(value: 0.3, isMuted: false).frame(width: 76)
+        }
+        HStack(spacing: 20) {
+            VolumeHUDIcon(level: 0.6, isMuted: true)
+            HUDLevel(value: 0.6, isMuted: true).frame(width: 76)
         }
         HStack(spacing: 20) {
             BatteryGlyph(battery: BatteryState(level: 0.76, isPluggedIn: true, isCharging: true))
@@ -276,6 +328,27 @@ struct NotchSlider: View {
     .font(.system(size: 14, weight: .semibold))
     .padding(20)
     .background(Theme.surface)
+}
+
+#Preview("HUD animation") {
+    struct Demo: View {
+        @State private var level = 0.3
+        var body: some View {
+            VStack(spacing: 14) {
+                HStack(spacing: 20) {
+                    VolumeHUDIcon(level: level, isMuted: false)
+                    HUDLevel(value: level, isMuted: false).frame(width: 76)
+                }
+                HStack {
+                    Button("−") { withAnimation(Motion.hud) { level = LevelStep.next(from: level, up: false, fine: false) } }
+                    Button("+") { withAnimation(Motion.hud) { level = LevelStep.next(from: level, up: true, fine: false) } }
+                }
+            }
+            .padding(20)
+            .background(Theme.surface)
+        }
+    }
+    return Demo()
 }
 
 #Preview("Sliders") {

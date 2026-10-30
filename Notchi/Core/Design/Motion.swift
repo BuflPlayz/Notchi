@@ -18,6 +18,11 @@ enum Motion {
         reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.32, dampingFraction: 0.92)
     }
 
+    /// Volume and brightness HUD updates: quick and soft, so rapid key repeats glide.
+    static var hud: Animation {
+        reduceMotion ? .linear(duration: 0.08) : .spring(response: 0.24, dampingFraction: 0.86)
+    }
+
     /// Small in-place changes (switching modules, compact content swaps).
     static var content: Animation {
         reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)

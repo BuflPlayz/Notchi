@@ -6,6 +6,8 @@ import os
 final class AppEnvironment {
     let registry = ModuleRegistry()
     private let screenTracker = ScreenTracker()
+    private let fullScreenMonitor = FullScreenMonitor()
+    private var preferencesObserver: NSObjectProtocol?
     private var model: NotchViewModel?
     private var windowController: NotchWindowController?
 
@@ -32,10 +34,20 @@ final class AppEnvironment {
         self.model = model
 
         // Re-anchor on display changes: a notch on the built-in display, an island on an external main display.
-        screenTracker.onChange = { [weak model] screen in
+        screenTracker.onChange = { [weak self, weak model] screen in
             model?.updateGeometry(.make(for: screen, forceIsland: Preferences.forceIsland))
+            self?.fullScreenMonitor.displayID = screen.displayID
         }
         screenTracker.start()
+
+        // Full-screen apps hide the notch, if the user wants that.
+        fullScreenMonitor.onChange = { [weak self] _ in self?.updateSuppression() }
+        fullScreenMonitor.start()
+        preferencesObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateSuppression() }
+        }
         registry.startAll()
         #if DEBUG
         installDebugCommands()
@@ -93,7 +105,12 @@ final class AppEnvironment {
     }
     #endif
 
+    private func updateSuppression() {
+        model?.setSuppressed(fullScreenMonitor.isFullScreen && Preferences.hideInFullScreen)
+    }
+
     func stop() {
+        fullScreenMonitor.stop()
         screenTracker.stop()
         registry.stopAll()
     }

@@ -105,7 +105,7 @@ final class MediaModule: NotchModule {
     }
 
     func compactTrailing() -> AnyView {
-        AnyView(AudioVisualizerView(isPlaying: info?.isPlaying == true, color: accent, levels: audioMonitor?.displayLevels))
+        AnyView(MediaVisualizer(module: self))
     }
 
     func settingsView() -> AnyView? {
@@ -175,5 +175,19 @@ final class MediaModule: NotchModule {
                 self.accent = decoded?.accent.map { Color(.sRGB, red: $0.red, green: $0.green, blue: $0.blue) } ?? Theme.primary
             }
         }
+    }
+}
+
+/// Compact visualizer that reads the audio levels itself, so the ~30 updates a second re-render
+/// only these bars, not the artwork and the rest of the compact notch.
+private struct MediaVisualizer: View {
+    let module: MediaModule
+
+    var body: some View {
+        AudioVisualizerView(
+            isPlaying: module.info?.isPlaying == true,
+            color: module.accent,
+            levels: module.audioMonitor?.displayLevels
+        )
     }
 }
