@@ -98,7 +98,8 @@ struct NotchContainerView: View {
             case .idle:
                 Color.clear
             case .compact:
-                if let module = model.registry.foreground {
+                // Empty while closed for a reopen: the old activity leaves, and the new one comes in as it opens.
+                if let module = model.compactModule {
                     CompactContentView(module: module, layout: layout)
                         .id(module.id)
                         .transition(Motion.contentTransition(reduceMotion: reduceMotion))

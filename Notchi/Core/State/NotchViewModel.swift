@@ -28,6 +28,9 @@ final class NotchViewModel {
     private(set) var isSuppressed = false
     /// Other live activities, as bubbles either side of the compact notch.
     private(set) var satellites = SatelliteSlots()
+    /// The module compact mode shows. Committed here with each transition rather than read live
+    /// from the registry, so new content waits for the animation that brings it in (a reopen, say).
+    private(set) var compactModuleID: String?
     /// Bumped by every swap, so the surface plays its warp toward `lastSwapSide`.
     private(set) var swapCount = 0
     private(set) var lastSwapSide = SatelliteSide.trailing
@@ -38,6 +41,11 @@ final class NotchViewModel {
     @ObservationIgnored private var expandRequested = false
     /// Squeezes out the replaced activity's bubble once the clicked one has been absorbed.
     @ObservationIgnored private var swapTask: Task<Void, Never>?
+    /// Reopens the notch once the close before it has played.
+    @ObservationIgnored private var reopenTask: Task<Void, Never>?
+    /// The module compact mode last showed, and whether that was a toast. A toast arriving over
+    /// another activity, or leaving one behind, reopens the notch.
+    @ObservationIgnored private var shownForeground: (id: String, isToast: Bool)?
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var preferencesObserver: NSObjectProtocol?
     /// While a size or appearance slider moves in Settings, the notch shows the state it applies to.
@@ -60,6 +68,10 @@ final class NotchViewModel {
 
     var selectedModule: (any NotchModule)? {
         selectedModuleID.flatMap(registry.module(withID:)) ?? registry.foreground ?? registry.modules.first
+    }
+
+    var compactModule: (any NotchModule)? {
+        compactModuleID.flatMap(registry.module(withID:))
     }
 
     /// One bubble beside the notch.
@@ -123,7 +135,7 @@ final class NotchViewModel {
     /// Click on a bubble: its activity swaps places with the one in the middle, and the one it
     /// replaces takes the bubble's slot.
     func bringToFront(_ id: String) {
-        guard state == .compact, !isSuppressed, let side = satellites.side(of: id), let current = registry.primary?.id else { return }
+        guard state == .compact, !isSuppressed, reopenTask == nil, let side = satellites.side(of: id), let current = registry.primary?.id else { return }
         let previousPreference = registry.preferredID
         registry.preferredID = id
         // Something more pressing (an urgent timer) keeps the middle; nothing moves.
@@ -146,6 +158,7 @@ final class NotchViewModel {
         withAnimation(Motion.swap) {
             swapCount += 1
             layout = newLayout
+            compactModuleID = registry.foreground?.id
         }
         withAnimation(Motion.satelliteAbsorb) { satellites = absorbed }
         // …then, a beat later, the activity it replaced squeezes out into the same slot.
@@ -182,16 +195,57 @@ final class NotchViewModel {
         if let preferred = registry.preferredID, registry.module(withID: preferred)?.liveActivity == nil {
             registry.preferredID = nil
         }
-        let activity = registry.foreground?.liveActivity
+        let foreground = registry.foreground
+        let activity = foreground?.liveActivity
         // In full screen only opted-in activities (the volume HUD) may show, and never expanded.
         let visibleActivity = isSuppressed ? activity.flatMap { $0.showsInFullScreen ? $0 : nil } : activity
         var target = NotchState.resolve(expandRequested: expandRequested && !isSuppressed, hasLiveActivity: visibleActivity != nil)
         if let sizePreview, sizePreview.rank > target.rank, !isSuppressed { target = sizePreview }
+
+        // While closed for a reopen, wait for it, unless the user opens the panel.
+        if reopenTask != nil {
+            guard target == .expanded else { return }
+            cancelReopen()
+        }
+        let shown = target == .compact ? foreground.map { (id: $0.id, isToast: activity?.priority == .transient) } : nil
+        defer { shownForeground = shown }
+        if let shown, let previous = shownForeground, state == .compact, previous.id != shown.id,
+           previous.isToast || shown.isToast, Motion.reopensForToasts {
+            reopen()
+            return
+        }
         let newLayout = targetLayout(for: target)
+        let newCompactID = target == .compact ? foreground?.id : nil
         // Mid-swap the slots are the swap's to manage; it re-evaluates when it's done.
         let newSatellites = swapTask == nil ? satellites.reconciled(with: registry.satelliteCandidates.map(\.id)) : satellites
-        guard target != state || newLayout != layout || newSatellites != satellites else { return }
+        guard target != state || newLayout != layout || newSatellites != satellites || newCompactID != compactModuleID else { return }
         transition(to: target, layout: newLayout, satellites: newSatellites)
+    }
+
+    /// A toast takes over compact mode (or hands it back): the notch closes into the hardware notch
+    /// as the old content fades, then springs open again with the new, like a fresh live activity.
+    private func reopen() {
+        let closed = targetLayout(for: .idle)
+        delegate?.notchWillTransition(
+            to: state,
+            layout: closed,
+            satellites: Self.visibleSides(state: state, satellites: satellites, suppressed: isSuppressed)
+        )
+        withAnimation(Motion.reopenClose) {
+            compactModuleID = nil
+            layout = closed
+        }
+        reopenTask = Task { [weak self] in
+            try? await Task.sleep(for: Motion.reopenBeat)
+            guard let self, !Task.isCancelled else { return }
+            self.reopenTask = nil
+            self.reevaluate()
+        }
+    }
+
+    private func cancelReopen() {
+        reopenTask?.cancel()
+        reopenTask = nil
     }
 
     private func transition(to target: NotchState, layout newLayout: NotchLayout, satellites newSatellites: SatelliteSlots) {
@@ -211,6 +265,7 @@ final class NotchViewModel {
         withAnimation(growing ? Motion.expand : Motion.collapse) {
             state = target
             layout = newLayout
+            compactModuleID = target == .compact ? registry.foreground?.id : nil
         }
         // New bubbles pop out of the notch with a wobble; leaving ones merge back in cleanly.
         let addsBubble = newSatellites.occupied.contains { side in
@@ -319,6 +374,7 @@ final class NotchViewModel {
         expandRequested = newState == .expanded
         state = newState
         layout = targetLayout(for: newState)
+        compactModuleID = newState == .compact ? registry.foreground?.id : nil
         satellites = satellites.reconciled(with: registry.satelliteCandidates.map(\.id))
     }
 }

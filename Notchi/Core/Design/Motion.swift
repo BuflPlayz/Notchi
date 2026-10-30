@@ -34,6 +34,16 @@ enum Motion {
         reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.38, dampingFraction: 0.8)
     }
 
+    /// Whether a toast taking over compact mode closes the notch and reopens it, instead of just
+    /// changing the content in place.
+    static var reopensForToasts: Bool { !reduceMotion }
+
+    /// The quick close before a reopen: no overshoot, so it tucks cleanly into the notch.
+    static let reopenClose = Animation.spring(response: 0.2, dampingFraction: 1)
+
+    /// How long the notch stays closed before reopening with the new content (`expand`).
+    static let reopenBeat: Duration = .milliseconds(170)
+
     /// A bubble being absorbed into the surface: quick, no overshoot.
     static var satelliteAbsorb: Animation {
         reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.28, dampingFraction: 0.95)

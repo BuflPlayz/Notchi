@@ -140,6 +140,38 @@ struct SatelliteTests {
         #expect(model.visibleSatellites.isEmpty)
     }
 
+    @Test func toastOverAnActivityClosesAndReopensTheNotch() async {
+        guard Motion.reopensForToasts else { return }   // Reduce Motion swaps in place
+        let registry = makeRegistry()
+        registry.register(TestModule(id: "media", priority: .active))
+        let system = TestModule(id: "system", priority: nil)
+        registry.register(system)
+        let model = NotchViewModel(geometry: .previewNotch, registry: registry)
+        #expect(model.compactModuleID == "media")
+        let open = model.layout
+
+        system.liveActivity = LiveActivity(priority: .transient)
+        await Task.yield()
+        await Task.yield()
+        // Closed into the notch, with nothing showing yet…
+        #expect(model.state == .compact)
+        #expect(model.compactModuleID == nil)
+        #expect(model.layout.size == NotchLayout.make(state: .idle, geometry: .previewNotch).size)
+
+        // …then open again with the toast.
+        try? await Task.sleep(for: Motion.reopenBeat * 2)
+        #expect(model.compactModuleID == "system")
+        #expect(model.layout == open)
+
+        // The toast ending reopens back to the activity underneath.
+        system.liveActivity = nil
+        await Task.yield()
+        await Task.yield()
+        #expect(model.compactModuleID == nil)
+        try? await Task.sleep(for: Motion.reopenBeat * 2)
+        #expect(model.compactModuleID == "media")
+    }
+
     @Test func bubblesHideWhileExpanded() {
         let registry = makeRegistry()
         registry.register(TestModule(id: "clock", priority: .active))

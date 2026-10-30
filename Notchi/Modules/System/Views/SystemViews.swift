@@ -2,13 +2,18 @@ import SwiftUI
 
 // MARK: - Compact (toasts)
 
-/// Spacing for the volume and brightness HUD. One inset is used for the icon's left edge, the
-/// number's right edge and both ends of the bar, so the HUD mirrors itself around the notch.
+/// Spacing for the volume and brightness HUD, which fits in the notch's own row: the icon and the
+/// number left of the notch, the level bar right of it. One inset is used for the icon's left edge
+/// and the bar's right edge, so the HUD mirrors itself around the notch.
 enum HUDMetrics {
     /// Distance from the shape's sides (inside the notch's ears) to the HUD's content.
     static let inset: CGFloat = 12
-    static let barRowHeight: CGFloat = 18
-    static let barHeight: CGFloat = 5
+    /// Distance from the notch to the content beside it: the number's right edge, the bar's left end.
+    static let notchGap: CGFloat = 8
+    /// Compact slot width the HUD asks for: room for the icon and the number on one side, and a
+    /// bar of the same length on the other.
+    static let sideWidth: CGFloat = 66
+    static let barHeight: CGFloat = 6
 }
 
 extension View {
@@ -32,7 +37,7 @@ private struct HUDSlot: ViewModifier {
     }
 }
 
-/// Left slot: the toast's icon.
+/// Left slot: the toast's icon, and the HUD's number next to it.
 struct SystemCompactLeading: View {
     let module: SystemModule
 
@@ -40,9 +45,9 @@ struct SystemCompactLeading: View {
         Group {
             switch module.toast {
             case .volume(let level, let isMuted):
-                VolumeHUDIcon(level: level, isMuted: isMuted).hudSlot(.leading)
+                HUDLeading(icon: VolumeHUDIcon(level: level, isMuted: isMuted), value: level, isMuted: isMuted)
             case .brightness(let level):
-                BrightnessHUDIcon(level: level).hudSlot(.leading)
+                HUDLeading(icon: BrightnessHUDIcon(level: level), value: level, isMuted: false)
             case .charging(let battery):
                 BatteryGlyph(battery: battery)
             case .lowBattery(let battery):
@@ -58,7 +63,7 @@ struct SystemCompactLeading: View {
     }
 }
 
-/// Right slot: a level bar for the HUD, or the toast's short status.
+/// Right slot: the HUD's level bar, or the toast's short status.
 struct SystemCompactTrailing: View {
     let module: SystemModule
 
@@ -66,9 +71,9 @@ struct SystemCompactTrailing: View {
         Group {
             switch module.toast {
             case .volume(let level, let isMuted):
-                HUDValue(value: level, isMuted: isMuted).hudSlot(.trailing)
+                HUDBar(value: isMuted ? 0 : level)
             case .brightness(let level):
-                HUDValue(value: level, isMuted: false).hudSlot(.trailing)
+                HUDBar(value: level)
             case .charging(let battery):
                 Text("\(battery.percent)%").foregroundStyle(.green)
             case .lowBattery(let battery):
@@ -81,6 +86,34 @@ struct SystemCompactTrailing: View {
         }
         .font(.system(size: 13, weight: .semibold).monospacedDigit())
         .lineLimit(1)
+    }
+}
+
+/// The HUD's left side: the icon pinned to the outer edge, the number running up to the notch.
+private struct HUDLeading<Icon: View>: View {
+    let icon: Icon
+    let value: Double
+    let isMuted: Bool
+
+    var body: some View {
+        HStack(spacing: 0) {
+            icon
+            Spacer(minLength: 4)
+            HUDValue(value: value, isMuted: isMuted)
+        }
+        .padding(.trailing, HUDMetrics.notchGap)
+        .hudSlot(.leading)
+    }
+}
+
+/// The HUD's right side: the level bar from the notch out to the outer edge.
+private struct HUDBar: View {
+    let value: Double
+
+    var body: some View {
+        LevelBar(value: value)
+            .padding(.leading, HUDMetrics.notchGap)
+            .hudSlot(.trailing)
     }
 }
 
@@ -97,28 +130,6 @@ struct HUDValue: View {
             .font(.system(size: 13, weight: .semibold).monospacedDigit())
             .foregroundStyle(isMuted ? Theme.tertiary : Theme.primary)
             .contentTransition(.numericText(value: Double(percent)))
-    }
-}
-
-/// The full-width row below the notch: the HUD's level bar, inset to line up with the icon and
-/// the number above it.
-struct SystemCompactBelow: View {
-    let module: SystemModule
-
-    var body: some View {
-        Group {
-            switch module.toast {
-            case .volume(let level, let isMuted):
-                LevelBar(value: isMuted ? 0 : level)
-            case .brightness(let level):
-                LevelBar(value: level)
-            default:
-                EmptyView()
-            }
-        }
-        .padding(.horizontal, HUDMetrics.inset)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .padding(.top, 3)
     }
 }
 
@@ -350,24 +361,21 @@ struct NotchSlider: View {
 
 // MARK: - Previews
 
-/// The HUD laid out like in the notch: icon and number on the outer edges, bar below.
+/// The HUD laid out like in the notch: icon and number left of the notch, bar right of it.
 private struct HUDPreviewRow: View {
     let icon: AnyView
     let value: Double
     let isMuted: Bool
 
     var body: some View {
-        VStack(spacing: 3) {
-            HStack {
-                icon.hudSlot(.leading)
-                Spacer(minLength: 120)
-                HUDValue(value: value, isMuted: isMuted).hudSlot(.trailing)
-            }
-            .frame(height: 32)
-            LevelBar(value: isMuted ? 0 : value).padding(.horizontal, HUDMetrics.inset)
+        HStack(spacing: 0) {
+            HUDLeading(icon: icon, value: value, isMuted: isMuted)
+                .frame(width: HUDMetrics.sideWidth)
+            Color.clear.frame(width: 120)
+            HUDBar(value: isMuted ? 0 : value)
+                .frame(width: HUDMetrics.sideWidth)
         }
-        .frame(width: 280)
-        .padding(.bottom, 10)
+        .frame(height: 32)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

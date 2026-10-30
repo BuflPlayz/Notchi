@@ -96,7 +96,6 @@ final class SystemModule: NotchModule {
 
     func compactLeading() -> AnyView { AnyView(SystemCompactLeading(module: self)) }
     func compactTrailing() -> AnyView { AnyView(SystemCompactTrailing(module: self)) }
-    func compactBelow() -> AnyView? { AnyView(SystemCompactBelow(module: self)) }
     func settingsView() -> AnyView? {
         AnyView(SystemSettingsView(module: self))
     }
@@ -229,8 +228,7 @@ final class SystemModule: NotchModule {
         let activity = LiveActivity(
             priority: .transient,
             sideWidth: max(Preferences.compactSideWidth, newToast.sideWidth),
-            showsInFullScreen: isHUD,
-            belowHeight: newToast.belowHeight
+            showsInFullScreen: isHUD
         )
         if liveActivity != activity { liveActivity = activity }
         toastTask?.cancel()
