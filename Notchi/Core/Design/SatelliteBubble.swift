@@ -13,6 +13,9 @@ struct SatelliteBubble: View {
     var body: some View {
         Button(action: action) {
             module.compactMinimal()
+                // No matched-geometry flights in here: artwork flying in from the notch's slot would
+                // swing around inside the circle, behind the bubble's own warp.
+                .environment(\.notchNamespace, nil)
                 .frame(width: diameter, height: diameter)
                 .background { NotchSurface(shape: Circle(), notch: nil, clarity: glassClarity / 100, glass: glassStyle) }
                 .clipShape(Circle())
@@ -38,8 +41,8 @@ private struct SatelliteButtonStyle: ButtonStyle {
 /// out of it (toward 0): it's pulled in toward the notch, stretching along the way like a drop of
 /// liquid, and blurs out as it meets the surface.
 ///
-/// Animatable, so the curves below run per frame instead of being blended linearly; a bouncy spring
-/// overshooting below 0 makes a freshly squeezed-out bubble wobble.
+/// Animatable, so the curves below run per frame instead of being blended linearly. A spring
+/// overshooting below 0 makes a freshly squeezed-out bubble wobble, at half strength.
 nonisolated struct SatelliteWarp: ViewModifier, Animatable {
     let side: SatelliteSide
     /// How far toward the notch's center the bubble travels when fully absorbed.
@@ -53,10 +56,11 @@ nonisolated struct SatelliteWarp: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let toward = -side.sign
+        let warp = progress < 0 ? progress / 2 : progress
         content
             // Anchored on the far side, so the stretch reaches toward the notch.
-            .scaleEffect(x: 1 + 0.7 * progress, y: 1 - 0.55 * progress, anchor: side == .leading ? .leading : .trailing)
-            .offset(x: toward * travel * progress)
+            .scaleEffect(x: 1 + 0.7 * warp, y: 1 - 0.55 * warp, anchor: side == .leading ? .leading : .trailing)
+            .offset(x: toward * travel * warp)
             .blur(radius: 5 * progress * progress)
             .opacity(min(1, 1 - progress * progress * progress))
     }

@@ -49,9 +49,9 @@ enum Motion {
         reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.28, dampingFraction: 0.95)
     }
 
-    /// A bubble squeezed out of the surface: overshoots, so it wobbles as it pops free.
+    /// A bubble squeezed out of the surface: a small overshoot, so it settles with one soft wobble.
     static var satelliteEmerge: Animation {
-        reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.62)
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.4, dampingFraction: 0.76)
     }
 
     /// How long a swap waits between absorbing the clicked bubble and squeezing out the one it replaces.
