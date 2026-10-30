@@ -49,12 +49,9 @@ struct SystemCompactLeading: View {
             case .brightness(let level):
                 HUDLeading(icon: BrightnessHUDIcon(level: level), value: level, isMuted: false)
             case .charging(let battery):
-                BatteryGlyph(battery: battery)
+                BatteryToastLabel(battery: battery, isLow: false)
             case .lowBattery(let battery):
-                BatteryGlyph(battery: battery)
-            case .focus(let focus):
-                Image(systemName: focus.isActive ? "moon.fill" : "moon")
-                    .foregroundStyle(focus.isActive ? Color.indigo : Theme.secondary)
+                BatteryToastLabel(battery: battery, isLow: true)
             case nil:
                 EmptyView()
             }
@@ -75,11 +72,9 @@ struct SystemCompactTrailing: View {
             case .brightness(let level):
                 HUDBar(value: level)
             case .charging(let battery):
-                Text("\(battery.percent)%").foregroundStyle(.green)
+                BatteryToastLevel(battery: battery, isLow: false)
             case .lowBattery(let battery):
-                Text("\(battery.percent)%").foregroundStyle(.red)
-            case .focus(let focus):
-                Text(focus.isActive ? "On" : "Off").foregroundStyle(focus.isActive ? Color.indigo : Theme.secondary)
+                BatteryToastLevel(battery: battery, isLow: true)
             case nil:
                 EmptyView()
             }
@@ -180,30 +175,94 @@ struct BrightnessHUDIcon: View {
     }
 }
 
-/// Battery symbol for a level, with a bolt while plugged in. Red at 20% and below on battery.
-struct BatteryGlyph: View {
+/// Spacing for the charging and low-battery toasts, laid out like the HUD: what happened left of
+/// the notch, the level right of it.
+enum BatteryToastMetrics {
+    /// Room for "Charging" or the percentage and battery, plus the HUD's insets.
+    static let chargingWidth: CGFloat = 78
+    /// "Low Battery" is a little longer.
+    static let lowWidth: CGFloat = 90
+}
+
+/// Left of the notch: "Charging" (or "Low Battery"), pinned to the outer edge.
+private struct BatteryToastLabel: View {
     let battery: BatteryState
+    let isLow: Bool
 
     var body: some View {
-        Image(systemName: Self.symbol(for: battery))
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(color, Theme.primary)
+        Text(isLow ? "Low Battery" : (battery.isCharging ? "Charging" : "Plugged In"))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Theme.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .hudSlot(.leading)
     }
+}
 
-    private var color: Color {
+/// Right of the notch: the percentage, then the battery filled to it, pinned to the outer edge.
+private struct BatteryToastLevel: View {
+    let battery: BatteryState
+    let isLow: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("\(battery.percent)%")
+                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                .foregroundStyle(BatteryIcon.tint(for: battery))
+            BatteryIcon(battery: battery, fillsOnAppear: true)
+        }
+        .hudSlot(.trailing)
+    }
+}
+
+/// A battery drawn to its real level: an outline with its terminal, filled green while plugged in,
+/// red at 20% and below on battery, white otherwise, with a bolt while charging.
+struct BatteryIcon: View {
+    let battery: BatteryState
+    /// Fills up from empty when it appears, like the iPhone's charging animation.
+    var fillsOnAppear = false
+    @State private var shownLevel: Double?
+
+    private static let size = CGSize(width: 25, height: 12)
+    private static let inset: CGFloat = 2
+
+    static func tint(for battery: BatteryState) -> Color {
         if battery.isPluggedIn { return .green }
         return battery.percent <= 20 ? .red : Theme.primary
     }
 
-    static func symbol(for battery: BatteryState) -> String {
-        if battery.isPluggedIn { return "battery.100percent.bolt" }
-        switch battery.percent {
-        case ..<13: return "battery.0percent"
-        case ..<38: return "battery.25percent"
-        case ..<63: return "battery.50percent"
-        case ..<88: return "battery.75percent"
-        default: return "battery.100percent"
+    var body: some View {
+        let level = min(max(shownLevel ?? battery.level, 0), 1)
+        let inner = Self.size.width - 2 * Self.inset
+        HStack(spacing: 1.5) {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(Theme.tertiary, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Self.tint(for: battery))
+                    // A sliver stays visible even near empty, so the color still reads.
+                    .frame(width: max(inner * level, level > 0 ? 2.5 : 0))
+                    .padding(Self.inset)
+            }
+            .frame(width: Self.size.width, height: Self.size.height)
+            .overlay {
+                if battery.isCharging {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundStyle(Theme.primary)
+                        .shadow(color: .black.opacity(0.6), radius: 1)
+                }
+            }
+            UnevenRoundedRectangle(bottomTrailingRadius: 1.5, topTrailingRadius: 1.5)
+                .fill(Theme.tertiary)
+                .frame(width: 1.5, height: 4)
         }
+        .onAppear {
+            guard fillsOnAppear else { return }
+            shownLevel = 0
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.9).delay(0.15)) { shownLevel = nil }
+        }
+        .accessibilityLabel("Battery \(battery.percent)%")
     }
 }
 
@@ -215,7 +274,7 @@ enum VolumeSymbol {
 
 // MARK: - Expanded
 
-/// Battery and Focus status, volume and brightness sliders, and the HUD permission prompt.
+/// Battery status, volume and brightness sliders, and the HUD permission prompt.
 struct SystemExpandedView: View {
     let module: SystemModule
 
@@ -224,17 +283,11 @@ struct SystemExpandedView: View {
             HStack(spacing: 10) {
                 if let battery = module.battery {
                     StatusTile(
-                        icon: AnyView(BatteryGlyph(battery: battery)),
+                        icon: AnyView(BatteryIcon(battery: battery)),
                         title: "\(battery.percent)%",
                         subtitle: Self.batterySubtitle(battery)
                     )
                 }
-                StatusTile(
-                    icon: AnyView(Image(systemName: module.focus.isActive ? "moon.fill" : "moon")
-                        .foregroundStyle(module.focus.isActive ? Color.indigo : Theme.secondary)),
-                    title: module.focus.isActive ? (module.focus.name ?? "Focus") : "Focus",
-                    subtitle: focusSubtitle
-                )
             }
 
             HStack(spacing: 16) {
@@ -261,16 +314,11 @@ struct SystemExpandedView: View {
         .onAppear(perform: module.refreshBrightness)
     }
 
-    private var focusSubtitle: String {
-        if !module.permission.isGranted { return "Needs Accessibility" }
-        return module.focus.isActive ? "On" : "Off"
-    }
-
     private var permissionPrompt: some View {
         HStack(spacing: 10) {
             Image(systemName: "hand.raised.fill")
                 .foregroundStyle(.yellow)
-            Text("Allow Accessibility to replace the volume and brightness HUD and show Focus.")
+            Text("Allow Accessibility to replace the volume and brightness HUD.")
                 .font(Theme.caption)
                 .foregroundStyle(Theme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -380,19 +428,31 @@ private struct HUDPreviewRow: View {
     }
 }
 
+/// A battery toast laid out like in the notch: the label left of the notch, the level right of it.
+private struct BatteryPreviewRow: View {
+    let battery: BatteryState
+    let isLow: Bool
+
+    var body: some View {
+        HStack(spacing: 0) {
+            BatteryToastLabel(battery: battery, isLow: isLow)
+                .frame(width: BatteryToastMetrics.lowWidth)
+            Color.clear.frame(width: 120)
+            BatteryToastLevel(battery: battery, isLow: isLow)
+                .frame(width: BatteryToastMetrics.lowWidth)
+        }
+        .frame(height: 32)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
 #Preview("Compact toasts") {
     VStack(spacing: 12) {
         HUDPreviewRow(icon: AnyView(VolumeHUDIcon(level: 0.6, isMuted: false)), value: 0.6, isMuted: false)
         HUDPreviewRow(icon: AnyView(BrightnessHUDIcon(level: 0.3)), value: 0.3, isMuted: false)
         HUDPreviewRow(icon: AnyView(VolumeHUDIcon(level: 0.6, isMuted: true)), value: 0.6, isMuted: true)
-        HStack(spacing: 20) {
-            BatteryGlyph(battery: BatteryState(level: 0.76, isPluggedIn: true, isCharging: true))
-            Text("76%").foregroundStyle(.green)
-        }
-        HStack(spacing: 20) {
-            BatteryGlyph(battery: BatteryState(level: 0.1, isPluggedIn: false, isCharging: false))
-            Text("10%").foregroundStyle(.red)
-        }
+        BatteryPreviewRow(battery: BatteryState(level: 0.76, isPluggedIn: true, isCharging: true), isLow: false)
+        BatteryPreviewRow(battery: BatteryState(level: 0.1, isPluggedIn: false, isCharging: false), isLow: true)
     }
     .font(.system(size: 14, weight: .semibold))
     .padding(20)

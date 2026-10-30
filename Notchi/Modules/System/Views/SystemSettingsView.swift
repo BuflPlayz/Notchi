@@ -6,12 +6,10 @@ struct SystemSettingsView: View {
 
     @AppStorage(Preferences.Key.replaceSystemHUD) private var replaceSystemHUD = true
     @AppStorage(Preferences.Key.batteryAlerts) private var batteryAlerts = true
-    @AppStorage(Preferences.Key.focusAlerts) private var focusAlerts = true
 
     var body: some View {
         Section {
             Toggle("Replace the volume and brightness HUD", isOn: $replaceSystemHUD)
-            Toggle("Show Focus changes", isOn: $focusAlerts)
             LabeledContent("Accessibility") {
                 if module.permission.isGranted {
                     Label("Allowed", systemImage: "checkmark.circle.fill")
@@ -24,9 +22,9 @@ struct SystemSettingsView: View {
                 }
             }
         } header: {
-            Text("Keys and Focus")
+            Text("Volume and brightness keys")
         } footer: {
-            SettingsFootnote("Both need Accessibility, which lets Notchi handle the volume and brightness keys and see Control Center's Focus indicator. Notchi reads nothing else. Without it, macOS keeps its own HUD.")
+            SettingsFootnote("Needs Accessibility, which lets Notchi handle the volume and brightness keys (and see Control Center's Focus indicator, for the Focus module). Notchi reads nothing else. Without it, macOS keeps its own HUD.")
         }
 
         Section {

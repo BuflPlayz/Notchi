@@ -21,6 +21,8 @@ final class AppEnvironment {
         registry.register(MediaModule(provider: NowPlayingService(), audioMonitor: AudioLevelMonitor()))
         // Files dragged onto the notch.
         registry.register(ShelfModule())
+        // An active Focus, quiet unless nothing else is running.
+        registry.register(FocusModule())
         // System toasts are transient (highest priority) whatever the order.
         registry.register(SystemModule())
     }
@@ -34,6 +36,12 @@ final class AppEnvironment {
         )
         windowController = NotchWindowController(model: model)
         self.model = model
+        // Focus announces itself only into a closed notch with nothing else in it (a Focus kept in
+        // the notch doesn't count).
+        (registry.module(withID: "focus") as? FocusModule)?.canAnnounce = { [weak model] in
+            guard let model, model.state != .expanded else { return false }
+            return !model.registry.modules.contains { $0.id != "focus" && $0.liveActivity != nil }
+        }
 
         // Re-anchor on display changes: a notch on the built-in display, an island on an external main display.
         screenTracker.onChange = { [weak self, weak model] screen in
@@ -60,7 +68,9 @@ final class AppEnvironment {
     /// Drive the notch from a terminal without touching the mouse, for testing and screen recordings:
     /// `swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("dev.notchi.debug"), object: "expand", userInfo: nil, deliverImmediately: true)'`
     /// Commands: `expand`, `collapse`, `show:<module id>` (open a module's page), `settings`,
-    /// `swap:<module id>` (click that module's bubble beside the notch),
+    /// `swap:<module id>` (click that module's bubble beside the notch), `focus:<name>` / `focus:off`,
+    /// `hud:charging:0.76` / `hud:low:0.1` (battery toasts), `focusDump` / `focusTrace` (what the Focus
+    /// monitor sees, written to `$TMPDIR`),
     /// `settings:<tab>` (general, modules, clock, media, system, about), `closeSettings`, `hud:volume:0.6` / `hud:brightness:0.3` / `hud:mute`, `audioTap` (runs the visualizer's audio tap for 6 s and logs
     /// the result under subsystem `dev.notchi.Notchi`, category `AudioTap`).
     private func installDebugCommands() {
@@ -82,6 +92,12 @@ final class AppEnvironment {
                     NotificationCenter.default.post(name: .notchiOpenSettings, object: nil)
                 case let command? where command.hasPrefix("hud:"):
                     (self?.registry.module(withID: "system") as? SystemModule)?.showDebugHUD(String(command.dropFirst("hud:".count)))
+                case "focusTrace": self?.runFocusTrace()
+                case "focusDump":
+                    let path = FileManager.default.temporaryDirectory.appending(path: "notchi-focus-dump.txt").path
+                    try? FocusMonitor.debugDump().write(toFile: path, atomically: true, encoding: .utf8)
+                case let command? where command.hasPrefix("focus:"):
+                    (self?.registry.module(withID: "focus") as? FocusModule)?.showDebugFocus(String(command.dropFirst("focus:".count)))
                 case let command? where command.hasPrefix("swap:"):
                     model.bringToFront(String(command.dropFirst("swap:".count)))
                 case "closeSettings":
@@ -92,6 +108,30 @@ final class AppEnvironment {
                 default: break
                 }
             }
+        }
+    }
+
+    /// For 40 s, records every menu bar AX notification, each read the Focus monitor makes, and (by a
+    /// 100 ms poll, only while tracing) when the Focus item really appears, with timestamps, to
+    /// `$TMPDIR/notchi-focus-trace.txt`.
+    private func runFocusTrace() {
+        let trace = TraceFile(path: FileManager.default.temporaryDirectory.appending(path: "notchi-focus-trace.txt").path)
+        let log: @MainActor (String) -> Void = { trace.append($0) }
+        log("trace started")
+        FocusMonitor.trace = log
+        var last = FocusMonitor.debugReadNow()
+        log("poll \(last)")
+        let poll = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let now = FocusMonitor.debugReadNow()
+                if now != last { log("poll \(now)"); last = now }
+            }
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(40))
+            poll.invalidate()
+            FocusMonitor.trace = nil
+            log("trace ended")
         }
     }
 
@@ -122,3 +162,20 @@ final class AppEnvironment {
         registry.stopAll()
     }
 }
+
+#if DEBUG
+/// Timestamped lines written to a file as they come, for the `focusTrace` debug command.
+@MainActor
+private final class TraceFile {
+    private let path: String
+    private let start = Date()
+    private var lines: [String] = []
+
+    init(path: String) { self.path = path }
+
+    func append(_ line: String) {
+        lines.append(String(format: "%7.3f ", Date().timeIntervalSince(start)) + line)
+        try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+    }
+}
+#endif

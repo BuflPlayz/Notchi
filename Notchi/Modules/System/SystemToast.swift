@@ -6,13 +6,12 @@ enum SystemToast: Equatable, Sendable {
     case brightness(level: Double)
     case charging(BatteryState)
     case lowBattery(BatteryState)
-    case focus(FocusState)
 
     /// How long it stays. HUDs disappear quickly; status changes linger a little.
     var duration: Duration {
         switch self {
         case .volume, .brightness: .milliseconds(1500)
-        case .charging, .focus: .seconds(3)
+        case .charging: .seconds(3)
         case .lowBattery: .seconds(5)
         }
     }
@@ -21,11 +20,12 @@ enum SystemToast: Equatable, Sendable {
     var sideWidth: CGFloat {
         switch self {
         case .volume, .brightness: HUDMetrics.sideWidth
-        case .charging, .lowBattery, .focus: 46
+        case .charging: BatteryToastMetrics.chargingWidth
+        case .lowBattery: BatteryToastMetrics.lowWidth
         }
     }
 
-    enum Kind: Equatable { case volume, brightness, charging, lowBattery, focus }
+    enum Kind: Equatable { case volume, brightness, charging, lowBattery }
 
     var kind: Kind {
         switch self {
@@ -33,7 +33,6 @@ enum SystemToast: Equatable, Sendable {
         case .brightness: .brightness
         case .charging: .charging
         case .lowBattery: .lowBattery
-        case .focus: .focus
         }
     }
 

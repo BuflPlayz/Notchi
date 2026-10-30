@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import IOKit.ps
 import Testing
@@ -86,6 +87,81 @@ struct FocusTests {
         #expect(FocusMonitor.focusName(fromDescription: "Work") == "Work")
         #expect(FocusMonitor.focusName(fromDescription: "Focus") == nil)
         #expect(FocusMonitor.focusName(fromDescription: nil) == nil)
+    }
+
+    @Test func builtInFocusesGetTheirOwnLook() {
+        #expect(FocusStyle(name: "Sleep").symbol == "bed.double.fill")
+        #expect(FocusStyle(name: "Work").symbol == "briefcase.fill")
+        #expect(FocusStyle(name: "My Custom Focus").symbol == "moon.fill")
+        // "Do Not Disturb" is too long beside the notch.
+        #expect(FocusStyle(name: "Do Not Disturb").label == "On")
+        #expect(FocusStyle(name: nil).label == "On")
+        #expect(FocusStyle(name: "Work").label == "Work")
+        for name in ["Sleep", "Work", "Personal", "Driving", "Fitness", "Gaming", "Mindfulness", "Reading", "Reduce Interruptions", "Custom"] {
+            #expect(NSImage(systemSymbolName: FocusStyle(name: name).symbol, accessibilityDescription: nil) != nil, "\(name)")
+        }
+    }
+
+    @MainActor
+    @Test func focusChangesAreAnnounced() async {
+        guard Preferences.focusAlerts else { return }   // the user's own setting
+        let focus = FocusModule(announcement: .milliseconds(50))
+        // The reading at launch isn't announced.
+        focus.apply(FocusState(isActive: true, name: "Work"), announce: false)
+        #expect(!focus.isAnnouncing)
+
+        // Turning off names the Focus that was on.
+        focus.apply(.inactive, announce: true)
+        #expect(focus.isAnnouncing)
+        #expect(focus.announcedName == "Work")
+        #expect(focus.style.symbol == "briefcase.fill")
+        #expect(focus.liveActivity?.priority == .transient)
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(focus.liveActivity == nil)
+
+        focus.apply(FocusState(isActive: true, name: "Sleep"), announce: true)
+        #expect(focus.announcedName == "Sleep")
+        #expect(focus.liveActivity?.priority == .transient)
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(!focus.isAnnouncing)
+        // Afterwards it only stays if the user asked for that.
+        #expect(focus.liveActivity?.priority == (Preferences.focusActivity ? .ambient : nil))
+    }
+
+    @MainActor
+    @Test func focusDoesntAnnounceIntoABusyNotch() {
+        guard Preferences.focusAlerts else { return }
+        let focus = FocusModule(announcement: .milliseconds(50))
+        focus.canAnnounce = { false }
+        focus.apply(FocusState(isActive: true, name: "Work"), announce: true)
+        #expect(!focus.isAnnouncing)
+        #expect(focus.liveActivity?.priority != .transient)
+    }
+
+    @MainActor
+    @Test func focusHasNoTabInThePanel() {
+        let registry = ModuleRegistry(defaults: UserDefaults(suiteName: "notchi.tests.\(UUID().uuidString)")!)
+        let focus = FocusModule()
+        registry.register(focus)
+        registry.register(MediaModule(provider: MockNowPlayingProvider()))
+        let model = NotchViewModel(geometry: .previewNotch, registry: registry)
+        #expect(model.panelModules.map(\.id) == ["media"])
+        // Even while Focus is announcing (and so in front), opening the panel shows a real page.
+        model.selectedModuleID = "focus"
+        #expect(model.selectedModule?.id == "media")
+    }
+
+    @MainActor
+    @Test func activeFocusIsABubbleBesideSomethingRunning() {
+        guard Preferences.focusActivity else { return }
+        let registry = ModuleRegistry(defaults: UserDefaults(suiteName: "notchi.tests.\(UUID().uuidString)")!)
+        let focus = FocusModule()
+        registry.register(focus)
+        registry.register(MediaModule(provider: MockNowPlayingProvider()))
+        registry.module(withID: "media")?.start()
+        focus.apply(FocusState(isActive: true, name: "Work"), announce: false)
+        #expect(registry.primary?.id == "media")
+        #expect(registry.satelliteCandidates.map(\.id) == ["focus"])
     }
 
     @Test func toastKinds() {

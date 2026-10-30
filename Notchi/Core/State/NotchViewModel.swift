@@ -69,8 +69,16 @@ final class NotchViewModel {
         reevaluate()
     }
 
+    /// Modules with a page in the expanded panel, in the user's order.
+    var panelModules: [any NotchModule] {
+        registry.modules.filter(\.showsInPanel)
+    }
+
+    /// The page the expanded panel shows: the user's pick, or what's live, or the first page.
     var selectedModule: (any NotchModule)? {
-        selectedModuleID.flatMap(registry.module(withID:)) ?? registry.foreground ?? registry.modules.first
+        [selectedModuleID.flatMap(registry.module(withID:)), registry.foreground]
+            .compactMap { $0 }
+            .first(where: \.showsInPanel) ?? panelModules.first
     }
 
     /// The module that takes things dropped on the notch, if one is enabled.

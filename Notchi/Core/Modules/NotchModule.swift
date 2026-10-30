@@ -27,6 +27,8 @@ protocol NotchModule: AnyObject, Observable {
     /// Full-width row below the notch in compact mode, shown when the live activity asks for
     /// `belowHeight`. Nil by default.
     func compactBelow() -> AnyView?
+    /// Whether the module has a page (and a tab) in the expanded panel. True by default.
+    var showsInPanel: Bool { get }
     /// The module's page in the expanded panel.
     func expandedView() -> AnyView
     /// Optional pane for the Settings window.
@@ -52,6 +54,7 @@ extension EnvironmentValues {
 }
 
 extension NotchModule {
+    var showsInPanel: Bool { true }
     func compactMinimal() -> AnyView { compactLeading() }
     func compactBelow() -> AnyView? { nil }
     func settingsView() -> AnyView? { nil }

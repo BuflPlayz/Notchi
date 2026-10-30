@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Mac activity in the notch: the volume and brightness HUD (replacing the system's), battery
-/// with plug-in and low-battery toasts, and Focus changes. The expanded page shows battery and
-/// Focus status with volume and brightness sliders.
+/// Mac activity in the notch: the volume and brightness HUD (replacing the system's), and battery
+/// with plug-in and low-battery toasts. The expanded page shows the battery with volume and
+/// brightness sliders. (Focus has its own module.)
 @MainActor
 @Observable
 final class SystemModule: NotchModule {
@@ -14,7 +14,6 @@ final class SystemModule: NotchModule {
     private(set) var battery: BatteryState?
     private(set) var volume = VolumeState(level: 0, isMuted: false, canChange: false)
     private(set) var brightness: Double?
-    private(set) var focus = FocusState.inactive
     private(set) var toast: SystemToast?
     private(set) var liveActivity: LiveActivity?
     /// True while Notchi owns the volume and brightness keys.
@@ -26,12 +25,10 @@ final class SystemModule: NotchModule {
     @ObservationIgnored private let volumeController = VolumeController()
     @ObservationIgnored private let brightnessController = BrightnessController()
     @ObservationIgnored private let keyInterceptor = MediaKeyInterceptor()
-    @ObservationIgnored private let focusMonitor = FocusMonitor()
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     @ObservationIgnored private var preferencesObserver: NSObjectProtocol?
     @ObservationIgnored private var hasVolumeReading = false
-    @ObservationIgnored private var hasFocusReading = false
-    /// False while the module is disabled in Settings: nothing may start the key tap or Focus reading.
+    /// False while the module is disabled in Settings: nothing may start the key tap.
     @ObservationIgnored private var isActive = false
 
     func start() {
@@ -39,7 +36,6 @@ final class SystemModule: NotchModule {
         isActive = true
         batteryMonitor.onChange = { [weak self] state in self?.batteryChanged(state) }
         volumeController.onChange = { [weak self] state in self?.volumeChanged(state) }
-        focusMonitor.onChange = { [weak self] state in self?.focusChanged(state) }
         keyInterceptor.handler = { [weak self] key, fine in self?.handle(key, fine: fine) ?? false }
 
         batteryMonitor.start()
@@ -60,8 +56,6 @@ final class SystemModule: NotchModule {
         volumeController.stop()
         keyInterceptor.stop()
         isReplacingHUD = false
-        focusMonitor.stop()
-        hasFocusReading = false
         hasVolumeReading = false
         toastTask?.cancel()
         toast = nil
@@ -116,7 +110,7 @@ final class SystemModule: NotchModule {
         }
     }
 
-    /// The key tap and Focus reading need Accessibility; start them once it's granted.
+    /// The key tap needs Accessibility; start it once it's granted.
     private func updatePermissionGatedFeatures() {
         guard isActive else { return }
         let granted = permission.isGranted
@@ -126,16 +120,6 @@ final class SystemModule: NotchModule {
             keyInterceptor.stop()
         }
         isReplacingHUD = keyInterceptor.isRunning
-
-        if granted && Preferences.focusAlerts {
-            if !hasFocusReading {
-                focusMonitor.start()          // reads the current state synchronously…
-                hasFocusReading = true        // …which is the baseline, not a change to announce
-            }
-        } else {
-            focusMonitor.stop()
-            hasFocusReading = false
-        }
     }
 
     // MARK: Keys
@@ -192,20 +176,17 @@ final class SystemModule: NotchModule {
         show(.volume(level: state.level, isMuted: state.isMuted), force: true)
     }
 
-    private func focusChanged(_ state: FocusState) {
-        focus = state
-        guard hasFocusReading, Preferences.focusAlerts else { return }
-        show(.focus(state))
-    }
-
     #if DEBUG
-    /// Shows the HUD without pressing keys (debug command `hud:volume:0.6`, `hud:brightness:0.3`, `hud:mute`).
+    /// Shows the HUD or a battery toast without pressing keys or plugging in (debug commands
+    /// `hud:volume:0.6`, `hud:brightness:0.3`, `hud:mute`, `hud:charging:0.76`, `hud:low:0.1`).
     func showDebugHUD(_ spec: String) {
         let parts = spec.split(separator: ":")
         let level = parts.count > 1 ? Double(parts[1]) ?? 0.6 : 0.6
         switch parts.first {
         case "brightness": show(.brightness(level: level), force: true)
         case "mute": show(.volume(level: level, isMuted: true), force: true)
+        case "charging": show(.charging(BatteryState(level: level, isPluggedIn: true, isCharging: true)), force: true)
+        case "low": show(.lowBattery(BatteryState(level: level, isPluggedIn: false, isCharging: false)), force: true)
         default: show(.volume(level: level, isMuted: false), force: true)
         }
     }

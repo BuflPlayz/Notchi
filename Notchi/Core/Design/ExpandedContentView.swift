@@ -54,7 +54,7 @@ struct ExpandedContentView: View {
 
     @ViewBuilder
     private var moduleSwitcher: some View {
-        let modules = model.registry.modules
+        let modules = model.panelModules
         if modules.count > 1 {
             ForEach(modules, id: \.id) { module in
                 Button {

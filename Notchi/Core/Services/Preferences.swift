@@ -14,6 +14,7 @@ enum Preferences {
         static let replaceSystemHUD = "replaceSystemHUD"
         static let batteryAlerts = "batteryAlerts"
         static let focusAlerts = "focusAlerts"
+        static let focusActivity = "focusActivity"
         static let openOnHover = "openOnHover"
         static let islandVisibleWhenIdle = "islandVisibleWhenIdle"
         static let clockShowsPaused = "clockShowsPaused"
@@ -36,7 +37,7 @@ enum Preferences {
     static let allKeys = [
         Key.expandDelay, Key.collapseDelay, Key.hapticsEnabled, Key.compactSideWidth, Key.expandedWidth,
         Key.showAllMediaSources, Key.realAudioVisualizer, Key.replaceSystemHUD, Key.batteryAlerts,
-        Key.focusAlerts, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen,
+        Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen,
         Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
         Key.compactAlignment, Key.openAnimation, Key.openDuration, Key.openBounce,
     ]
@@ -53,6 +54,7 @@ enum Preferences {
             Key.replaceSystemHUD: true,
             Key.batteryAlerts: true,
             Key.focusAlerts: true,
+            Key.focusActivity: false,
             Key.openOnHover: true,
             Key.islandVisibleWhenIdle: true,
             Key.clockShowsPaused: true,
@@ -96,8 +98,10 @@ enum Preferences {
     static var hideInFullScreen: Bool { value(Key.hideInFullScreen, default: true) }
     /// Show paused Clock timers and a paused stopwatch in compact mode, not just running ones.
     static var clockShowsPaused: Bool { value(Key.clockShowsPaused, default: true) }
-    /// Toasts when a Focus turns on or off (needs Accessibility).
+    /// Announce in the notch when a Focus turns on or off (needs Accessibility).
     static var focusAlerts: Bool { value(Key.focusAlerts, default: true) }
+    /// Keep an active Focus in the notch as a quiet live activity (needs Accessibility).
+    static var focusActivity: Bool { value(Key.focusActivity, default: false) }
     /// How see-through the surface is, in percent: 0 is solid black, 100 is as clear as the glass gets.
     static var glassClarity: Double { value(Key.glassClarity, default: 85.0) }
     /// Brightness of the light rim around the surface, in percent. 0 turns it off.
