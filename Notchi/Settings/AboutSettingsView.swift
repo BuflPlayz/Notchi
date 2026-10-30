@@ -11,20 +11,17 @@ struct AboutSettingsView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.black)
-                    .frame(width: 72, height: 72)
-                UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8)
-                    .fill(Color(white: 0.18))
-                    .frame(width: 34, height: 12)
-                    .offset(y: -30)
-            }
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 84, height: 84)
             VStack(spacing: 4) {
                 Text("Notchi").font(.title2.weight(.semibold))
                 Text(version).foregroundStyle(.secondary)
                 Text("A Dynamic Island for your Mac's notch.")
                     .foregroundStyle(.secondary)
+                Text("© 2026 BuflPlayz · MIT License")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
 
             Divider().padding(.horizontal, 40)
