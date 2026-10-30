@@ -215,6 +215,15 @@ Details:
 - **Permission flow:** `AccessibilityPermission` is requested only from the System page or Settings. Grants are picked up through the `com.apple.accessibility.api` distributed notification, with no polling. The project is signed with the Apple Development identity, so grants survive rebuilds (ad-hoc signatures change every build).
 - **Not handled yet:** keyboard backlight keys (left to the system), DDC/CI brightness for third-party monitors, and an AirPods/output-device toast (later phase).
 
+## 7b. Shelf (implemented)
+
+Drag files, images, links or text onto the notch to keep them for later, or to share them.
+- **Noticing a drag:** `DragDetector` uses global mouse monitors. A drag that starts after the drag pasteboard changed is carrying something. Global monitors only see other apps' events, so dragging an item out of the Shelf doesn't count. While a drag is on, the notch's hit area reaches `Metrics.dropReach` (40 pt) further, and entering it opens the panel at once to the Shelf, without the hover delay and even with "Open on hover" off.
+- **Drop targets:** while dragging, the expanded panel shows the drop module's `dropView()` (`NotchDropHandler`, so the core still knows no module by name): **Shelf** keeps the items, and **Share** opens `NSSharingServicePicker` (AirDrop, Messages, Mail…) at the cursor.
+- **What's kept:** a dropped file stays where it is, and the Shelf remembers its path. SwiftUI hands a dragged file over as its content type (a .txt as plain text), so `ShelfDropLoader` asks for it in place, which returns the original. Things that aren't files (an image or text from a browser, a link as a `.webloc`) are written to Application Support/Notchi/Shelf, each in its own folder so it keeps its name, and deleted when removed from the Shelf. The list survives relaunch, and files that have since vanished are dropped.
+- **Using items:** drag a tile out (receivers get a copy, so a Finder drop never moves the original), click to open, or right-click for Open, Show in Finder, Share… and Remove. **Clear** empties the Shelf.
+- The Shelf never takes compact mode; it's there when the notch is open.
+
 ## 8. Settings, permissions, distribution (implemented, milestone e)
 
 - **Settings window:** a SwiftUI `Settings` scene with toolbar tabs: General, Modules, one pane per module, and About. It opens from the notch's right-click menu or its ⋯ menu, and remembers the last tab. Each module supplies its own pane through `NotchModule.settingsView()`, so a new module gets a Settings tab just by implementing it.

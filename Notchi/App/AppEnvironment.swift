@@ -19,6 +19,8 @@ final class AppEnvironment {
         // Order breaks priority ties: a running Clock timer takes the compact slots over playing music.
         registry.register(ClockModule(provider: MobileTimerClockProvider()))
         registry.register(MediaModule(provider: NowPlayingService(), audioMonitor: AudioLevelMonitor()))
+        // Files dragged onto the notch.
+        registry.register(ShelfModule())
         // System toasts are transient (highest priority) whatever the order.
         registry.register(SystemModule())
     }

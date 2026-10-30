@@ -38,6 +38,14 @@ protocol NotchModule: AnyObject, Observable {
     func stop()
 }
 
+/// A module that takes things dragged onto the notch. While a drag is over the open notch, the
+/// panel shows its `dropView()` in place of the selected page.
+@MainActor
+protocol NotchDropHandler: NotchModule {
+    /// Drop targets for the expanded panel, shown only while something is being dragged.
+    func dropView() -> AnyView
+}
+
 extension NotchModule {
     func compactMinimal() -> AnyView { compactLeading() }
     func compactBelow() -> AnyView? { nil }

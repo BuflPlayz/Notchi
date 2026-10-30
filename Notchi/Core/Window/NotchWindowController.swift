@@ -12,6 +12,7 @@ final class NotchWindowController: NotchViewModelDelegate {
     private let panel = NotchPanel()
     private let model: NotchViewModel
     private let hover: HoverController
+    private let dragDetector = DragDetector()
     private var clickAwayMonitor: Any?
 
     init(model: NotchViewModel) {
@@ -31,10 +32,15 @@ final class NotchWindowController: NotchViewModelDelegate {
             model?.hoverChanged(isInside: isInside)
         }
         model.delegate = self
+        dragDetector.onChange = { [weak self] isDragging in
+            self?.hover.isDragging = isDragging
+            self?.model.setDragging(isDragging)
+        }
 
         placePanel()
         panel.orderFrontRegardless()
         hover.start()
+        dragDetector.start()
     }
 
     // MARK: NotchViewModelDelegate

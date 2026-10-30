@@ -26,6 +26,8 @@ final class NotchViewModel {
     /// True while a full-screen app is in front (and "Hide in full screen" is on): the notch stays
     /// out of the way except for activities that opt in, and hover is ignored.
     private(set) var isSuppressed = false
+    /// True while the user drags something (from another app) that the notch could take.
+    private(set) var isDragging = false
     /// Other live activities, as bubbles either side of the compact notch.
     private(set) var satellites = SatelliteSlots()
     /// The module compact mode shows. Committed here with each transition rather than read live
@@ -70,6 +72,11 @@ final class NotchViewModel {
         selectedModuleID.flatMap(registry.module(withID:)) ?? registry.foreground ?? registry.modules.first
     }
 
+    /// The module that takes things dropped on the notch, if one is enabled.
+    var dropHandler: (any NotchDropHandler)? {
+        registry.modules.lazy.compactMap { $0 as? any NotchDropHandler }.first
+    }
+
     var compactModule: (any NotchModule)? {
         compactModuleID.flatMap(registry.module(withID:))
     }
@@ -97,6 +104,13 @@ final class NotchViewModel {
     func hoverChanged(isInside: Bool) {
         hoverTask?.cancel()
         if isSuppressed { return }
+        // Something dragged onto the notch opens it straight to the drop targets, without the
+        // hover delay, even with "Open on hover" off.
+        if isInside && isDragging, let dropHandler {
+            selectedModuleID = dropHandler.id
+            setExpandRequested(true)
+            return
+        }
         // Leaving cancels a pending expand right away; there's nothing to wait for if we're not expanded.
         if !isInside && !expandRequested { return }
         // With "Open on hover" off, only a click opens; moving away still closes.
@@ -107,6 +121,12 @@ final class NotchViewModel {
             guard !Task.isCancelled else { return }
             self?.setExpandRequested(isInside)
         }
+    }
+
+    /// A drag started or ended anywhere on screen.
+    func setDragging(_ dragging: Bool) {
+        guard dragging != isDragging else { return }
+        withAnimation(Motion.content) { isDragging = dragging }
     }
 
     /// Hides or shows the notch for full-screen apps.
@@ -251,7 +271,8 @@ final class NotchViewModel {
     private func transition(to target: NotchState, layout newLayout: NotchLayout, satellites newSatellites: SatelliteSlots) {
         let opening = target == .expanded && state != .expanded
         if opening {
-            if let foreground = registry.foreground?.id { selectedModuleID = foreground }
+            // A drag opens to the drop targets (already selected); otherwise show what's live.
+            if !isDragging, let foreground = registry.foreground?.id { selectedModuleID = foreground }
             Haptics.expand()
         }
 

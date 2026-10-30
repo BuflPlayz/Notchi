@@ -10,6 +10,10 @@ import AppKit
 final class HoverController {
     /// Reports cursor enter/exit over the shape.
     var onHoverChange: ((Bool) -> Void)?
+    /// While something is being dragged, the shape reaches `Metrics.dropReach` further.
+    var isDragging = false {
+        didSet { update(cursorMoved: false) }
+    }
 
     private let panel: NSPanel
     private var hitRect: CGRect = .zero
@@ -55,7 +59,8 @@ final class HoverController {
 
     private func update(cursorMoved: Bool) {
         let location = NSEvent.mouseLocation
-        let inside = hitRect.contains(location)
+        let reach = isDragging ? -Metrics.dropReach : 0
+        let inside = hitRect.insetBy(dx: reach, dy: reach).contains(location)
         let clickable = inside || clickRects.contains { $0.contains(location) }
         if panel.ignoresMouseEvents == clickable {
             panel.ignoresMouseEvents = !clickable

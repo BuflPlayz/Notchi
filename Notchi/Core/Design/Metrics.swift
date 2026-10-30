@@ -55,6 +55,10 @@ enum Metrics {
         static let topCurveRange: ClosedRange<CGFloat> = 0...28
     }
 
+    /// While something is being dragged, how far beyond the shape the cursor opens the notch, so a
+    /// drag doesn't have to find the (hidden) notch exactly.
+    static let dropReach: CGFloat = 40
+
     /// Round bubbles beside the compact surface, one per extra live activity.
     enum Satellite {
         /// Clear space between a bubble and the surface's side, so it reads as detached.
