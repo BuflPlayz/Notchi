@@ -26,6 +26,7 @@ enum Preferences {
         static let notchCornerRadius = "notchCornerRadius"
         static let notchTopCurve = "notchTopCurve"
         static let compactAlignment = "compactAlignment"
+        static let compactLip = "compactLip"
         static let openAnimation = "openAnimation"
         static let openDuration = "openDuration"
         static let openBounce = "openBounce"
@@ -42,7 +43,7 @@ enum Preferences {
         Key.showAllMediaSources, Key.realAudioVisualizer, Key.replaceSystemHUD, Key.batteryAlerts,
         Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen,
         Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
-        Key.compactAlignment, Key.openAnimation, Key.openDuration, Key.openBounce,
+        Key.compactAlignment, Key.compactLip, Key.openAnimation, Key.openDuration, Key.openBounce,
         Key.agentAnnouncesDone, Key.agentShowsStep, Key.agentTintsGlass,
     ]
 
@@ -70,6 +71,7 @@ enum Preferences {
             Key.notchCornerRadius: Double(Metrics.Notch.expandedBottomRadius),
             Key.notchTopCurve: Double(Metrics.Notch.expandedTopRadius),
             Key.compactAlignment: CompactAlignment.center.rawValue,
+            Key.compactLip: Double(Metrics.Notch.compactBottomLip),
             Key.openAnimation: OpenAnimation.snappy.rawValue,
             Key.openDuration: 0.35,
             Key.openBounce: 22.0,
@@ -141,6 +143,9 @@ enum Preferences {
     static var agentShowsStep: Bool { value(Key.agentShowsStep, default: false) }
     /// The notch's glass takes on the color of the agent in it.
     static var agentTintsGlass: Bool { value(Key.agentTintsGlass, default: true) }
+    /// How far the closed notch reaches below the physical one while it shows a live activity, in
+    /// points: 0 is flush with the camera housing.
+    static var compactLip: CGFloat { CGFloat(value(Key.compactLip, default: Double(Metrics.Notch.compactBottomLip))) }
     static var forceIsland: Bool { value(Key.forceIsland, default: false) }
 
     /// Reads a stored value, falling back when nothing is stored or registered (tests and previews).

@@ -38,6 +38,8 @@ struct NotchLayout: Equatable, Sendable {
     ///     Compact keeps the same proportion to its default.
     ///   - topCurve: Notch only: the expanded panel's concave ear radius (user setting). Compact
     ///     keeps the same proportion to its default.
+    ///   - compactLip: Notch only: how far the compact surface reaches below the physical notch
+    ///     (user setting).
     static func make(
         state: NotchState,
         geometry: NotchGeometry,
@@ -45,7 +47,8 @@ struct NotchLayout: Equatable, Sendable {
         expandedWidth: CGFloat = Metrics.expandedWidth,
         belowHeight: CGFloat = 0,
         cornerRadius: CGFloat = Metrics.Notch.expandedBottomRadius,
-        topCurve: CGFloat = Metrics.Notch.expandedTopRadius
+        topCurve: CGFloat = Metrics.Notch.expandedTopRadius,
+        compactLip: CGFloat = Metrics.Notch.compactBottomLip
     ) -> NotchLayout {
         let sideWidth = min(max(sideWidth, 0), Metrics.maxCompactSideWidth)
         let expandedWidth = min(max(expandedWidth, Metrics.expandedWidthRange.lowerBound), Metrics.expandedWidthRange.upperBound)
@@ -54,7 +57,11 @@ struct NotchLayout: Equatable, Sendable {
             top: min(max(topCurve, Metrics.Notch.topCurveRange.lowerBound), Metrics.Notch.topCurveRange.upperBound)
         )
         var layout = switch geometry.style {
-        case .notch: notchLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth, corners: corners)
+        case .notch:
+            notchLayout(
+                state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth, corners: corners,
+                lip: min(max(compactLip, Metrics.Notch.compactBottomLipRange.lowerBound), Metrics.Notch.compactBottomLipRange.upperBound)
+            )
         case .island: islandLayout(state: state, geometry: geometry, sideWidth: sideWidth, expandedWidth: expandedWidth)
         }
         if state == .compact && belowHeight > 0 {
@@ -102,7 +109,7 @@ struct NotchLayout: Equatable, Sendable {
         var compactTop: CGFloat { top * Metrics.Notch.compactTopRadius / Metrics.Notch.expandedTopRadius }
     }
 
-    private static func notchLayout(state: NotchState, geometry: NotchGeometry, sideWidth: CGFloat, expandedWidth: CGFloat, corners: NotchCorners) -> NotchLayout {
+    private static func notchLayout(state: NotchState, geometry: NotchGeometry, sideWidth: CGFloat, expandedWidth: CGFloat, corners: NotchCorners, lip: CGFloat) -> NotchLayout {
         let notch = geometry.idleSize
         switch state {
         case .idle:
@@ -113,7 +120,6 @@ struct NotchLayout: Equatable, Sendable {
             )
         case .compact:
             let ears = corners.compactTop
-            let lip = Metrics.Notch.compactBottomLip
             return NotchLayout(
                 size: CGSize(width: notch.width + 2 * sideWidth + 2 * ears, height: notch.height + lip),
                 topInset: 0, topRadius: ears, bottomRadius: corners.compactBottom,

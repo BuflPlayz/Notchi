@@ -63,7 +63,7 @@ struct NotchContainerView: View {
                 .animation(Motion.content, value: surfaceTint)
             }
             .clipShape(shape)
-            .overlay { NotchRim(shape: shape, style: model.geometry.style, brightness: rimBrightness) }
+            .overlay { NotchRim(shape: shape, style: model.geometry.style, brightness: rimBrightness, notchFade: rimFade(layout: layout)) }
             .swapPulse(trigger: reduceMotion ? 0 : model.swapCount)
             .contentShape(shape)
             .shadow(color: .black.opacity(islandShadowOpacity), radius: 18, y: 8)
@@ -129,6 +129,12 @@ struct NotchContainerView: View {
     /// The color the activity in the middle asks for, only while the notch shows it.
     private var surfaceTint: Color? {
         model.state == .compact ? model.compactModule?.liveActivity?.surfaceTint : nil
+    }
+
+    /// Notch style: the outline fades before the camera housing when the surface barely reaches below it.
+    private func rimFade(layout: NotchLayout) -> NotchRimFade? {
+        guard model.geometry.style == .notch else { return nil }
+        return NotchRimFade(notch: model.geometry.idleSize, shapeWidth: layout.size.width, height: layout.size.height)
     }
 
     /// Only the expanded island casts a shadow: it floats over content instead of blending into hardware.

@@ -18,6 +18,7 @@ struct GeneralSettingsView: View {
     @AppStorage(Preferences.Key.notchCornerRadius) private var cornerRadius = Double(Metrics.Notch.expandedBottomRadius)
     @AppStorage(Preferences.Key.notchTopCurve) private var topCurve = Double(Metrics.Notch.expandedTopRadius)
     @AppStorage(Preferences.Key.compactAlignment) private var compactAlignment = CompactAlignment.center
+    @AppStorage(Preferences.Key.compactLip) private var compactLip = Double(Metrics.Notch.compactBottomLip)
     @AppStorage(Preferences.Key.openAnimation) private var openAnimation = OpenAnimation.snappy
     @AppStorage(Preferences.Key.openDuration) private var openDuration = 0.35
     @AppStorage(Preferences.Key.openBounce) private var openBounce = 22.0
@@ -65,6 +66,15 @@ struct GeneralSettingsView: View {
 
             Section {
                 SettingsSliderRow(title: "Live activity width", value: $compactSideWidth, range: Metrics.compactSideWidthRange, step: 2, unit: "pt")
+                // Shown as the closed notch's height: the physical notch's, plus the lip below it.
+                SettingsSliderRow(
+                    title: "Live activity height",
+                    value: Binding(get: { notchHeight + compactLip }, set: { compactLip = $0 - notchHeight }),
+                    range: CGFloat(notchHeight) + Metrics.Notch.compactBottomLipRange.lowerBound...CGFloat(notchHeight) + Metrics.Notch.compactBottomLipRange.upperBound,
+                    step: 0.5,
+                    unit: "pt",
+                    fractionDigits: 1
+                )
                 Picker("Live activity position", selection: $compactAlignment) {
                     ForEach(CompactAlignment.allCases) { Text($0.title).tag($0) }
                 }
@@ -74,7 +84,7 @@ struct GeneralSettingsView: View {
             } header: {
                 Text("Size")
             } footer: {
-                SettingsFootnote("The notch previews the size while you drag. Edges pins live activities to the outer sides with a little padding; the volume and brightness HUD always sits there. The island is what Notchi shows on a main display without a notch; with it hidden, hovering its spot still opens it.")
+                SettingsFootnote("The notch previews the size while you drag. Live activity height goes from flush with the camera housing to a few points below it, on displays with a notch; the shorter it is, the more its outline fades out before the housing. Edges pins live activities to the outer sides with a little padding; the volume and brightness HUD always sits there. The island is what Notchi shows on a main display without a notch; with it hidden, hovering its spot still opens it.")
             }
 
             Section {
@@ -103,6 +113,12 @@ struct GeneralSettingsView: View {
         } message: {
             Text("Sizes, behavior, module order and which modules are on go back to their defaults. Permissions and launch at login stay as they are.")
         }
+    }
+
+    /// The main display's physical notch height, or a typical one when it has no notch.
+    private var notchHeight: Double {
+        let top = NSScreen.screens.first?.safeAreaInsets.top ?? 0
+        return top > 0 ? Double(top) : 32
     }
 
     private func resetAll() {

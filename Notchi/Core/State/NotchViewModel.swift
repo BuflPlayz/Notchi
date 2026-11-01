@@ -58,6 +58,7 @@ final class NotchViewModel {
     @ObservationIgnored private var lastLook = (clarity: Preferences.glassClarity, edge: Preferences.edgeHighlight, blend: Preferences.notchBlend)
     @ObservationIgnored private var lastCorners = (bottom: Preferences.notchCornerRadius, top: Preferences.notchTopCurve)
     @ObservationIgnored private var lastAlignment = Preferences.compactAlignment
+    @ObservationIgnored private var lastLip = Preferences.compactLip
     @ObservationIgnored private var lastMotion = (style: Preferences.openAnimation, duration: Preferences.openDuration, bounce: Preferences.openBounce)
 
     init(geometry: NotchGeometry, registry: ModuleRegistry) {
@@ -335,7 +336,8 @@ final class NotchViewModel {
             expandedWidth: Preferences.expandedWidth,
             belowHeight: activity?.belowHeight ?? 0,
             cornerRadius: Preferences.notchCornerRadius,
-            topCurve: Preferences.notchTopCurve
+            topCurve: Preferences.notchTopCurve,
+            compactLip: Preferences.compactLip
         )
     }
 
@@ -370,6 +372,10 @@ final class NotchViewModel {
         if Preferences.compactAlignment != lastAlignment {
             showSizePreview(.compact)
             lastAlignment = Preferences.compactAlignment
+        }
+        if Preferences.compactLip != lastLip {
+            showSizePreview(.compact)
+            lastLip = Preferences.compactLip
         }
         let motion = (style: Preferences.openAnimation, duration: Preferences.openDuration, bounce: Preferences.openBounce)
         if motion != lastMotion {

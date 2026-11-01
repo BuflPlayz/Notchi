@@ -61,6 +61,8 @@ struct NotchRim<S: Shape>: View {
     let style: NotchGeometry.Style
     /// 0 turns the rim off, 1 is its brightest.
     let brightness: Double
+    /// Notch style: fades the outline out where it would run under the physical notch.
+    var notchFade: NotchRimFade? = nil
 
     var body: some View {
         let overhang: CGFloat = 2
@@ -77,8 +79,51 @@ struct NotchRim<S: Shape>: View {
                 }
                 .padding(-overhang)
             }
+            .mask {
+                if let notchFade {
+                    LinearGradient(stops: notchFade.stops(overhang: overhang), startPoint: .leading, endPoint: .trailing)
+                        .padding(-overhang)
+                } else {
+                    Color.black.padding(-overhang)
+                }
+            }
             .opacity(brightness > 0 ? 1 : 0)
             .allowsHitTesting(false)
+    }
+}
+
+/// Where the surface's bottom edge runs under the physical notch, the camera housing hides it, and
+/// the outline would stop dead at the housing's sides. This fades it out on the way there instead,
+/// as much as the bottom edge is hidden: fully when the surface is flush with the notch, not at all
+/// once it reaches `compactBottomLip` below it.
+struct NotchRimFade: Equatable {
+    var notchWidth: CGFloat
+    var shapeWidth: CGFloat
+    /// How much of the outline shows below the notch: 0 hides it, 1 leaves it whole.
+    var centerOpacity: Double
+
+    /// For a surface `height` tall over a notch of `notch` size.
+    init(notch: CGSize, shapeWidth: CGFloat, height: CGFloat) {
+        notchWidth = notch.width
+        self.shapeWidth = shapeWidth
+        centerOpacity = Double(min(max((height - notch.height) / Metrics.Notch.compactBottomLip, 0), 1))
+    }
+
+    /// Mask stops across the rim, which reaches `overhang` past the shape on each side.
+    func stops(overhang: CGFloat) -> [Gradient.Stop] {
+        let total = shapeWidth + 2 * overhang
+        guard total > 0, notchWidth < shapeWidth else { return [.init(color: .black, location: 0), .init(color: .black, location: 1)] }
+        let notchEdge = (shapeWidth - notchWidth) / 2 + overhang
+        let fadeStart = max(0, notchEdge - Metrics.Notch.rimFadeLength)
+        let center = Color.black.opacity(centerOpacity)
+        return [
+            .init(color: .black, location: 0),
+            .init(color: .black, location: fadeStart / total),
+            .init(color: center, location: notchEdge / total),
+            .init(color: center, location: (total - notchEdge) / total),
+            .init(color: .black, location: (total - fadeStart) / total),
+            .init(color: .black, location: 1),
+        ]
     }
 }
 

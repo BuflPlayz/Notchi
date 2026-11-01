@@ -36,6 +36,12 @@ enum Metrics {
         /// How far the compact surface reaches below the physical notch, so its bottom edge and
         /// outline show instead of hiding under the hardware.
         static let compactBottomLip: CGFloat = 4
+        /// Range of the "Live activity height" setting, as the lip below the physical notch: 0 is
+        /// flush with the camera housing, the top is the default.
+        static let compactBottomLipRange: ClosedRange<CGFloat> = 0...compactBottomLip
+        /// How far before the physical notch the outline fades out, when the lip is too short for it
+        /// to show below the notch.
+        static let rimFadeLength: CGFloat = 24
         static let expandedTopRadius: CGFloat = 14
         static let expandedBottomRadius: CGFloat = 32
 

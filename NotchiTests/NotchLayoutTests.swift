@@ -142,3 +142,30 @@ struct PanelTabTests {
         #expect(ExpandedContentView.tabsFitting(sideWidth: 0) == 1)
     }
 }
+
+struct CompactHeightTests {
+    @Test func compactHeightRunsFromTheNotchToTheDefault() {
+        let geometry = NotchGeometry.previewNotch
+        let flush = NotchLayout.make(state: .compact, geometry: geometry, compactLip: 0)
+        #expect(flush.size.height == geometry.idleSize.height)
+        #expect(flush.bottomLip == 0)
+        let tall = NotchLayout.make(state: .compact, geometry: geometry, compactLip: 40)
+        #expect(tall.size.height == geometry.idleSize.height + Metrics.Notch.compactBottomLip)
+        // The island and the opened notch don't change.
+        #expect(NotchLayout.make(state: .expanded, geometry: geometry, compactLip: 0) == NotchLayout.make(state: .expanded, geometry: geometry))
+        #expect(NotchLayout.make(state: .compact, geometry: .previewIsland, compactLip: 0) == NotchLayout.make(state: .compact, geometry: .previewIsland))
+    }
+
+    @Test func theOutlineFadesAsMuchAsTheNotchHidesIt() {
+        let notch = CGSize(width: 200, height: 32)
+        #expect(NotchRimFade(notch: notch, shapeWidth: 300, height: 32).centerOpacity == 0)
+        #expect(NotchRimFade(notch: notch, shapeWidth: 300, height: 34).centerOpacity == 0.5)
+        #expect(NotchRimFade(notch: notch, shapeWidth: 300, height: 36).centerOpacity == 1)
+        #expect(NotchRimFade(notch: notch, shapeWidth: 460, height: 172).centerOpacity == 1)   // opened
+
+        // Full strength out at the sides, fading over the last 24 pt before the housing.
+        let stops = NotchRimFade(notch: notch, shapeWidth: 300, height: 32).stops(overhang: 0)
+        let expected: [CGFloat] = [0, 26 / 300, 50 / 300, 250 / 300, 274 / 300, 1]
+        #expect(stops.map(\.location) == expected)
+    }
+}
