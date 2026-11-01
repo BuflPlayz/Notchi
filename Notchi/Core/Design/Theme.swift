@@ -20,6 +20,11 @@ enum Theme {
     /// Faint white lift at the bottom, so the glass reads lighter rather than just less black.
     static func glassSheen(clarity: Double) -> Color { .white.opacity(0.08 * clarity) }
 
+    /// A color laid over the glass, faint at the top and fuller at the bottom.
+    static func glassColor(_ tint: Color) -> [Color] {
+        [tint.opacity(0.12), tint.opacity(0.32)]
+    }
+
     /// Light catching the surface's edge, dimmer at the top than the bottom. `brightness` runs from 0 to 1.
     static func glassRim(brightness: Double) -> [Color] {
         [.white.opacity(0.2 * brightness), .white.opacity(0.4 * brightness)]

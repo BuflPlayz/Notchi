@@ -18,6 +18,8 @@ final class AppEnvironment {
     init() {
         // Order breaks priority ties: a running Clock timer takes the compact slots over playing music.
         registry.register(ClockModule(provider: MobileTimerClockProvider()))
+        // Coding agents at work, one live activity per running session.
+        registry.register(AgentsModule())
         registry.register(MediaModule(provider: NowPlayingService(), audioMonitor: AudioLevelMonitor()))
         // Files dragged onto the notch.
         registry.register(ShelfModule())
@@ -40,7 +42,7 @@ final class AppEnvironment {
         // the notch doesn't count).
         (registry.module(withID: "focus") as? FocusModule)?.canAnnounce = { [weak model] in
             guard let model, model.state != .expanded else { return false }
-            return !model.registry.modules.contains { $0.id != "focus" && $0.liveActivity != nil }
+            return !model.registry.activityModules.contains { $0.id != "focus" && $0.liveActivity != nil }
         }
 
         // Re-anchor on display changes: a notch on the built-in display, an island on an external main display.
@@ -69,6 +71,7 @@ final class AppEnvironment {
     /// `swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("dev.notchi.debug"), object: "expand", userInfo: nil, deliverImmediately: true)'`
     /// Commands: `expand`, `collapse`, `show:<module id>` (open a module's page), `settings`,
     /// `swap:<module id>` (click that module's bubble beside the notch), `focus:<name>` / `focus:off`,
+    /// `agent:<claude|codex|gemini>:<working|thinking|plan|waiting|done|failed>` / `agent:clear` (fake sessions),
     /// `hud:charging:0.76` / `hud:low:0.1` (battery toasts), `focusDump` / `focusTrace` (what the Focus
     /// monitor sees, written to `$TMPDIR`),
     /// `settings:<tab>` (general, modules, clock, media, system, about), `closeSettings`, `hud:volume:0.6` / `hud:brightness:0.3` / `hud:mute`, `audioTap` (runs the visualizer's audio tap for 6 s and logs
@@ -98,6 +101,8 @@ final class AppEnvironment {
                     try? FocusMonitor.debugDump().write(toFile: path, atomically: true, encoding: .utf8)
                 case let command? where command.hasPrefix("focus:"):
                     (self?.registry.module(withID: "focus") as? FocusModule)?.showDebugFocus(String(command.dropFirst("focus:".count)))
+                case let command? where command.hasPrefix("agent:"):
+                    (self?.registry.module(withID: "agents") as? AgentsModule)?.showDebugAgent(String(command.dropFirst("agent:".count)))
                 case let command? where command.hasPrefix("swap:"):
                     model.bringToFront(String(command.dropFirst("swap:".count)))
                 case "closeSettings":

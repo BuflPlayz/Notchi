@@ -22,6 +22,7 @@ struct SettingsView: View {
             ForEach(registry.orderedModules, id: \.id) { module in
                 if let pane = module.settingsView() {
                     SettingsPane { pane }
+                        .environment(\.moduleRegistry, registry)
                         .tabItem { Label(module.title, systemImage: module.symbol) }
                         .tag(module.id)
                 }
@@ -87,6 +88,33 @@ struct SettingsSliderRow: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .trailing)
             }
+        }
+    }
+}
+
+extension EnvironmentValues {
+    /// The registry, for module panes that switch their own module on or off.
+    @Entry var moduleRegistry: ModuleRegistry? = nil
+}
+
+/// A module's own on/off switch at the top of its pane: the same as its switch in Settings ›
+/// Modules. Off stops the module completely.
+struct ModuleEnabledToggle: View {
+    let moduleID: String
+    let title: String
+    @Environment(\.moduleRegistry) private var registry
+
+    var body: some View {
+        if let registry {
+            // `modules` is observed, so the switch follows changes made in the Modules pane too.
+            let enabled = registry.modules.contains { $0.id == moduleID }
+            let isLastEnabled = enabled && registry.modules.count == 1
+            Toggle(title, isOn: Binding(
+                get: { enabled },
+                set: { registry.setEnabled($0, for: moduleID) }
+            ))
+            .disabled(isLastEnabled)
+            .help(isLastEnabled ? "At least one module stays on." : "")
         }
     }
 }

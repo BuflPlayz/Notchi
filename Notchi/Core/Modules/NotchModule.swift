@@ -40,6 +40,16 @@ protocol NotchModule: AnyObject, Observable {
     func stop()
 }
 
+/// A module whose live activities come and go on their own, one per thing it follows (each running
+/// coding agent, say). To compact mode every child is a module of its own: it takes the middle or a
+/// bubble and can be swapped in. Settings, the panel's tabs and the module order only see the group.
+@MainActor
+protocol NotchActivityGroup: NotchModule {
+    /// The group's children, in tie-break order. Ids must be unique across all modules. Keep a child
+    /// listed for a moment after its activity ends, so the notch can animate its content away.
+    var activities: [any NotchModule] { get }
+}
+
 /// A module that takes things dragged onto the notch. While a drag is over the open notch, the
 /// panel shows its `dropView()` in place of the selected page.
 @MainActor

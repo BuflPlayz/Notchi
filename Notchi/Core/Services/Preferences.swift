@@ -29,6 +29,9 @@ enum Preferences {
         static let openAnimation = "openAnimation"
         static let openDuration = "openDuration"
         static let openBounce = "openBounce"
+        static let agentAnnouncesDone = "agentAnnouncesDone"
+        static let agentShowsStep = "agentShowsStep"
+        static let agentTintsGlass = "agentTintsGlass"
         /// Debug: draw the Dynamic Island even on a notched display. Launch with `-NotchiForceIsland YES`.
         static let forceIsland = "NotchiForceIsland"
     }
@@ -40,6 +43,7 @@ enum Preferences {
         Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen,
         Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
         Key.compactAlignment, Key.openAnimation, Key.openDuration, Key.openBounce,
+        Key.agentAnnouncesDone, Key.agentShowsStep, Key.agentTintsGlass,
     ]
 
     static func registerDefaults() {
@@ -69,6 +73,9 @@ enum Preferences {
             Key.openAnimation: OpenAnimation.snappy.rawValue,
             Key.openDuration: 0.35,
             Key.openBounce: 22.0,
+            Key.agentAnnouncesDone: true,
+            Key.agentShowsStep: false,
+            Key.agentTintsGlass: true,
             Key.forceIsland: false,
         ])
     }
@@ -128,6 +135,12 @@ enum Preferences {
     static var compactAlignment: CompactAlignment {
         CompactAlignment(rawValue: value(Key.compactAlignment, default: "")) ?? .center
     }
+    /// A short "Done" toast when a coding agent finishes a request.
+    static var agentAnnouncesDone: Bool { value(Key.agentAnnouncesDone, default: true) }
+    /// A row under the notch with what a running agent is doing ("Editing NotchShape.swift").
+    static var agentShowsStep: Bool { value(Key.agentShowsStep, default: false) }
+    /// The notch's glass takes on the color of the agent in it.
+    static var agentTintsGlass: Bool { value(Key.agentTintsGlass, default: true) }
     static var forceIsland: Bool { value(Key.forceIsland, default: false) }
 
     /// Reads a stored value, falling back when nothing is stored or registered (tests and previews).

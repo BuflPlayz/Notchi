@@ -17,6 +17,7 @@ On a notched MacBook display, Notchi grows out of the camera notch. On a main di
 - **Battery.** Charging and low-battery toasts with a battery drawn to its real level.
 - **Focus.** Turning a Focus on or off is announced in the notch, with its symbol and name.
 - **Shelf.** Drag files, images, links or text onto the notch to keep them for later, then drag them back out. Or drop them on Share for AirDrop, Messages, Mail and more.
+- **Coding agents.** Claude Code, Codex and Gemini CLI at work, each running session as its own live activity with the agent's own mascot: Clawd from Claude.app, your Codex pet from the Codex app. See what each is doing ("Editing NotchShape.swift"), its plan's progress and how long the request has run. The glass can take on the agent's color. An agent that needs your permission takes the middle; a finished request says "Done". Works with no setup; optional hooks (Settings › Agents) make the steps exact and instant.
 - **Your look.** Glass style and clarity, corner radius, top curve, notch blend, open animation, and live activity and panel widths, all applying live. Toasts reopen the notch as they take over.
 
 ## Requirements
@@ -119,11 +120,12 @@ xcodebuild -project Notchi.xcodeproj -scheme Notchi test
   | Object | Does |
   |---|---|
   | `expand`, `collapse` | Opens or closes the panel |
-  | `show:<module>` | Opens a module's page (`media`, `clock`, `shelf`, `system`) |
+  | `show:<module>` | Opens a module's page (`media`, `clock`, `agents`, `shelf`, `system`) |
   | `swap:<module>` | Clicks that module's bubble beside the notch |
   | `hud:volume:0.6`, `hud:brightness:0.3`, `hud:mute` | Shows the HUD without pressing keys |
   | `hud:charging:0.76`, `hud:low:0.1` | Shows a battery toast |
   | `focus:<name>`, `focus:off` | Pretends a Focus turned on or off |
+  | `agent:<claude\|codex\|gemini>:<state>`, `agent:clear` | Fakes an agent session (`working`, `thinking`, `plan`, `waiting`, `done`, `failed`), or removes the fakes |
   | `focusDump`, `focusTrace` | Writes what the Focus monitor sees (a snapshot, or a 40 s timed trace) to `$TMPDIR` |
   | `settings`, `settings:<tab>`, `closeSettings` | Opens Settings (at `general`, `modules`, a module's tab, or `about`), or closes it |
   | `audioTap` | Runs the visualizer's audio tap for 6 s and logs the result under subsystem `dev.notchi.Notchi` |
@@ -135,7 +137,8 @@ xcodebuild -project Notchi.xcodeproj -scheme Notchi test
 - [x] Stacked live activities with swappable bubbles
 - [x] Shelf for dropped files
 - [ ] Notchi's own stopwatch and timer
-- [ ] AirPods and output-device toasts, clipboard, agent activity (`notchi notify` from Claude Code and other agents)
+- [x] Coding agents: Claude Code, Codex and Gemini CLI, with their mascots
+- [ ] AirPods and output-device toasts, clipboard
 
 ## License
 

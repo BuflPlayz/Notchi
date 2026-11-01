@@ -32,8 +32,29 @@ final class ModuleRegistry {
         applyPreferences()
     }
 
+    /// Enabled modules, each followed by its children if it's an activity group: everything that can
+    /// hold a live activity, in tie-break order.
+    var activityModules: [any NotchModule] {
+        modules.flatMap { module -> [any NotchModule] in
+            guard let group = module as? any NotchActivityGroup else { return [module] }
+            return [module] + group.activities
+        }
+    }
+
+    /// An enabled module, or an enabled group's child.
     func module(withID id: String) -> (any NotchModule)? {
-        modules.first { $0.id == id }
+        activityModules.first { $0.id == id }
+    }
+
+    /// The module whose page shows `id` in the panel: the module itself, or a child's group.
+    func panelModuleID(for id: String) -> String? {
+        for module in modules {
+            if module.id == id { return id }
+            if let group = module as? any NotchActivityGroup, group.activities.contains(where: { $0.id == id }) {
+                return module.id
+            }
+        }
+        return nil
     }
 
     /// The module the user brought into the middle by clicking its bubble. It keeps the middle while
@@ -43,13 +64,13 @@ final class ModuleRegistry {
     /// The module whose live activity fills the compact slots: a toast if one is showing, otherwise
     /// `primary`. Reading this tracks every enabled module's activity.
     var foreground: (any NotchModule)? {
-        Self.highestPriority(in: modules.filter { $0.liveActivity?.priority == .transient }) ?? primary
+        Self.highestPriority(in: activityModules.filter { $0.liveActivity?.priority == .transient }) ?? primary
     }
 
     /// The module in the middle when no toast is showing: the user's pick, unless something more
     /// pressing than "running" comes along; otherwise the highest priority, ties to the earlier module.
     var primary: (any NotchModule)? {
-        let candidates = modules.filter { Self.isLasting($0) }
+        let candidates = activityModules.filter { Self.isLasting($0) }
         guard let best = Self.highestPriority(in: candidates), let bestPriority = best.liveActivity?.priority else { return nil }
         if let preferred = candidates.first(where: { $0.id == preferredID }),
            let preferredPriority = preferred.liveActivity?.priority,
@@ -63,7 +84,7 @@ final class ModuleRegistry {
     /// Toasts never become bubbles; they come and go in the middle.
     var satelliteCandidates: [any NotchModule] {
         let primaryID = primary?.id
-        return modules.enumerated()
+        return activityModules.enumerated()
             .filter { Self.isLasting($0.element) && $0.element.id != primaryID }
             .sorted { lhs, rhs in
                 let left = lhs.element.liveActivity?.priority ?? .ambient
@@ -93,7 +114,7 @@ final class ModuleRegistry {
     /// Modules with a live activity that lost to `foreground`.
     var background: [any NotchModule] {
         let winnerID = foreground?.id
-        return modules.filter { $0.liveActivity != nil && $0.id != winnerID }
+        return activityModules.filter { $0.liveActivity != nil && $0.id != winnerID }
     }
 
     func startAll() {

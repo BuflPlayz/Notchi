@@ -74,10 +74,11 @@ final class NotchViewModel {
         registry.modules.filter(\.showsInPanel)
     }
 
-    /// The page the expanded panel shows: the user's pick, or what's live, or the first page.
+    /// The page the expanded panel shows: the user's pick, or what's live, or the first page. A group's
+    /// child (one agent's activity) shows its group's page.
     var selectedModule: (any NotchModule)? {
-        [selectedModuleID.flatMap(registry.module(withID:)), registry.foreground]
-            .compactMap { $0 }
+        [selectedModuleID, registry.foreground?.id]
+            .compactMap { $0.flatMap(registry.panelModuleID(for:)).flatMap(registry.module(withID:)) }
             .first(where: \.showsInPanel) ?? panelModules.first
     }
 

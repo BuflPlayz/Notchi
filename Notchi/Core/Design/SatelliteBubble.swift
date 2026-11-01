@@ -17,7 +17,9 @@ struct SatelliteBubble: View {
                 // swing around inside the circle, behind the bubble's own warp.
                 .environment(\.notchNamespace, nil)
                 .frame(width: diameter, height: diameter)
-                .background { NotchSurface(shape: Circle(), notch: nil, clarity: glassClarity / 100, glass: glassStyle) }
+                .background {
+                    NotchSurface(shape: Circle(), notch: nil, clarity: glassClarity / 100, glass: glassStyle, tint: module.liveActivity?.surfaceTint)
+                }
                 .clipShape(Circle())
                 .overlay { NotchRim(shape: Circle(), style: .island, brightness: edgeHighlight / 100) }
                 .contentShape(Circle())

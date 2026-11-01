@@ -146,7 +146,9 @@ The registry picks the highest-priority live activity for the compact slots. If 
 - Bubbles take clicks but don't count as a hover (`HoverController`'s click-only rects), so they never open the panel. The fixed panel is sized to fit a bubble on each side of the widest compact notch.
 - Debug: `swap:<module id>` (see `AppEnvironment`) clicks a module's bubble.
 
-Later-phase modules plug in through the same protocol: File Shelf, AirPods, Clipboard, and Agent Activity. **Agent integration** gets a local inbound channel in the core: a `notchi://` URL scheme plus a small bundled `notchi` CLI that talks to the app over a Unix-domain socket. Claude Code hooks (or any agent) can then run `notchi notify --source claude --status running "Editing 3 files"`, and an `AgentModule` renders it as a live activity.
+**Activity groups (implemented).** A module that follows several things at once (one per running coding agent) conforms to `NotchActivityGroup` and lists its children in `activities`. Each child is a `NotchModule` of its own to compact mode: `ModuleRegistry.activityModules` (enabled modules, each followed by its children) is what `foreground`, `primary` and `satelliteCandidates` rank, so a child takes the middle or a bubble and can be swapped in. Settings, the panel's tabs and the module order see only the group; `panelModuleID(for:)` maps a child to its group's page.
+
+Later-phase modules plug in through the same protocol: AirPods and Clipboard.
 
 ## 5. Media: research and trade-offs
 
@@ -227,12 +229,32 @@ Drag files, images, links or text onto the notch to keep them for later, or to s
 - **Using items:** drag a tile out (receivers get a copy, so a Finder drop never moves the original), click to open, or right-click for Open, Show in Finder, Share… and Remove. **Clear** empties the Shelf.
 - The Shelf never takes compact mode; it's there when the notch is open.
 
+## 7c. Coding agents (implemented)
+
+Claude Code, Codex and Gemini CLI in the notch, each running session as its own live activity (`AgentsModule`, a `NotchActivityGroup` of `AgentSessionActivity`).
+
+- **Compact:** the agent's mascot acts out what it's doing (thinking, working, reading, waiting, celebrating, failing), and the request's running time (or the plan's `3/7`) on the right, in the agent's color. The glass takes on the agent's color too (Settings › Agents, on by default): a live activity can ask for a `surfaceTint`, which `NotchSurface` applies as Liquid Glass's own tint plus a faint gradient over the black, in the notch and in the activity's bubble. Both are static layers; measured with Codex's pet animating, the tint added well under 1% CPU. Optionally (off by default), a row below the notch shows the current step ("Editing NotchShape.swift") and a plan bar. The mascot keeps its size; where an animation would reach higher than the room above it (Clawd's thought bubble and jumps, under the top of the screen), a calmer one of his that fits plays instead (`ClawdSprites.animationNames`). A session waiting for permission or an answer is `urgent` and takes the middle; a finished request shows a short `transient` "Done" toast. Extra sessions are bubbles.
+- **Expanded:** the Agents page lists running sessions, then idle ones from the last 30 minutes, with step, plan and time.
+- **Finding sessions with no setup** (`AgentLogReader`, an actor fed by one FSEvents stream, `FileEventStream`; nothing runs while agents are quiet). Each log is read from where the last read stopped.
+  - Claude Code: `~/.claude/sessions/<pid>.json` gives each live session's status (`busy`, `idle`, `waitingFor`) and name; the transcript (`~/.claude/projects/<folder>/<id>.jsonl`) gives the steps and plan. A session found mid-request catches up on the transcript lines written since it started (up to 32 MB back, decoding only lines about tools).
+  - Codex: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (`task_started`, `task_complete`, tool calls, approval requests).
+  - Gemini CLI: `~/.gemini/tmp/<project>/chats/session-*.jsonl`, where each update repeats the conversation; only the newest message matters.
+  - Sessions whose process is gone (Claude Code) or whose log went quiet mid-request (20 min Codex, 10 min Gemini) are retired by a sweep that runs once a minute, only while something runs.
+- **Hooks (optional, Settings › Agents):** `AgentHookInstaller` adds `notchi-agent-hook <agent>` to `~/.claude/settings.json`, `~/.codex/hooks.json` or `~/.gemini/settings.json` (keeping `.notchi-backup`; only entries running Notchi's script are ever touched). The script (Application Support/Notchi/Agents) drops the hook's JSON in `Inbox/` and exits at once, printing nothing, and drops nothing unless `notchi.pid` names a live process. A Unix socket was tried first: `nc -U` waits for the other end to close, which would hold up every tool call. A hooked agent's logs are no longer read for steps (Codex and Gemini name sessions differently in hooks); Claude Code's status files are read either way.
+- **One model for every agent:** sources turn what they read into `AgentEvent`s (`turnStarted`, `toolStarted(step)`, `planUpdated`, `needsInput`, `turnEnded`…), and `AgentSession.apply` folds them into a phase, step, plan and times. `AgentToolDescriber` maps tool calls by family (Claude's `Edit`, Codex's `apply_patch` and Gemini's `replace` all read "Editing …") and reads plans from TodoWrite, Claude Code's tasks, Codex's and the Claude app's `update_plan`, and Gemini's `write_todos`.
+- **Mascots, from the agents' own apps at runtime** (`AgentMascots`); nothing of theirs is in the repo:
+  - Clawd: Claude.app's Clawd Quest keeps his animations as a palette plus per-frame pixel deltas in a table in `app.asar` (`clawdQuestEngine-*.js`). `ClawdSprites` finds the table (`AsarArchive`), turns the minified literal into JSON and decodes the frames it needs in memory.
+  - Codex: the pet selected in the Codex app (`selected-avatar-id` in `~/.codex/config.toml`): a hatched one from `~/.codex/pets/<id>/`, or a built-in `<id>-spritesheet-v*.webp` from the Codex app's `app.asar`. Pets are 8 × 11 atlases of 192 × 208 cells; rows 0–8 are idle, running right and left, waving, jumping, failed, waiting, running and review, played with Codex's own timings.
+  - Gemini CLI has no app: a tinted sparkle. Without its app, an agent shows the app icon or a symbol.
+  - Every animation (sprite frames, the sparkle's and the "needs you" hand's pulse) plays in Core Animation (`LayerAnimationView`: a `CAKeyframeAnimation` of the layer's `contents`, or an opacity pulse), so it runs in the render server and SwiftUI never redraws for it. Measured with `top` over 15 s: a SwiftUI frame loop cost 3–5% CPU per mascot and `symbolEffect(.pulse)` about 11%; with Core Animation each state stays under 1%, and an empty notch is 0%.
+- Debug: `agent:<claude|codex|gemini>:<working|thinking|plan|waiting|done|failed>` fakes a session, `agent:clear` removes them.
+
 ## 8. Settings, permissions, distribution (implemented, milestone e)
 
 - **Settings window:** a SwiftUI `Settings` scene with toolbar tabs: General, Modules, one pane per module, and About. It opens from the notch's right-click menu or its ⋯ menu, and remembers the last tab. Each module supplies its own pane through `NotchModule.settingsView()`, so a new module gets a Settings tab just by implementing it.
 - **General:** launch at login (`SMAppService.mainApp`, with a shortcut to Login Items if the user turned it off there), open on hover or click only, open/close delays, haptics, live activity width, panel width, the island at rest, and Reset All Settings.
 - **Modules:** drag to reorder and switch each module on or off (`ModuleRegistry`, persisted as `moduleOrder`/`disabledModules`). The order sets the expanded tabs and breaks compact-mode ties. Disabled modules are stopped. The last enabled module can't be switched off.
-- **Module panes:** Now Playing (sources, active provider, visualizer), Clock (paused items, open Clock), System (HUD, Focus, Accessibility status, battery toasts).
+- **Module panes:** Now Playing (sources, active provider, visualizer), Clock (paused items, open Clock), Agents (step row, done toasts, hooks per agent, where each mascot came from), System (HUD, Focus, Accessibility status, battery toasts).
 - Everything writes to `UserDefaults` and applies live through `UserDefaults.didChangeNotification` or direct registry calls. No restart is needed.
 - `Permissions`: Accessibility is requested only from the System page or Settings, with the reason shown next to the button. Audio recording is requested by macOS the first time music plays with the visualizer on.
 - **No sandbox** (required for the adapter process and the Core Audio tap), hardened runtime on, signed with the Apple Development identity for local builds, and Developer ID plus notarization for distribution. Nothing requires SIP changes.

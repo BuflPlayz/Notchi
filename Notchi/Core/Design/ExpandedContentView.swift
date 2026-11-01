@@ -29,10 +29,15 @@ struct ExpandedContentView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 4) {
-            moduleSwitcher
+        let modules = model.panelModules
+        // Tabs fill the space left of the notch; any that don't fit continue right of it, so none
+        // hides under the camera.
+        let leftCount = modules.count > 1 ? min(modules.count, Self.tabsFitting(sideWidth: sideWidth)) : modules.count
+        return HStack(spacing: Self.tabSpacing) {
+            moduleSwitcher(Array(modules.prefix(leftCount)), showsTitle: modules.count == 1)
             // Keep the header's controls out from under the physical notch.
-            Spacer(minLength: layout.centerGap + 16)
+            Spacer(minLength: layout.centerGap + 2 * Self.notchClearance)
+            moduleSwitcher(Array(modules.dropFirst(leftCount)), showsTitle: false)
             Menu {
                 Button("Settings…") {
                     NotificationCenter.default.post(name: .notchiOpenSettings, object: nil)
@@ -52,10 +57,24 @@ struct ExpandedContentView: View {
         }
     }
 
+    private static let tabSize: CGFloat = 26
+    private static let tabSpacing: CGFloat = 4
+    /// Clear space between the header's controls and the notch on each side.
+    private static let notchClearance: CGFloat = 8
+
+    /// Room for controls on one side of the notch.
+    private var sideWidth: CGFloat {
+        (layout.size.width - layout.centerGap) / 2 - (layout.horizontalInset + 12) - Self.notchClearance
+    }
+
+    /// How many tab buttons fit in `sideWidth` (at least one).
+    static func tabsFitting(sideWidth: CGFloat) -> Int {
+        max(1, Int((sideWidth + tabSpacing) / (tabSize + tabSpacing)))
+    }
+
     @ViewBuilder
-    private var moduleSwitcher: some View {
-        let modules = model.panelModules
-        if modules.count > 1 {
+    private func moduleSwitcher(_ modules: [any NotchModule], showsTitle: Bool) -> some View {
+        if !showsTitle {
             ForEach(modules, id: \.id) { module in
                 Button {
                     withAnimation(Motion.content) { model.selectedModuleID = module.id }

@@ -15,17 +15,23 @@ struct NotchSurface<S: Shape>: View {
     var glass: GlassStyle = .clear
     /// How far the notch's black feathers out into the glass, in points.
     var blend: CGFloat = Metrics.Notch.hardwareBlend
+    /// A color the glass takes on (a live activity's own), or nil.
+    var tint: Color? = nil
 
     var body: some View {
         ZStack {
             LinearGradient(stops: Theme.glassTint(clarity: clarity), startPoint: .top, endPoint: .bottom)
             LinearGradient(colors: [.clear, Theme.glassSheen(clarity: clarity)], startPoint: .top, endPoint: .bottom)
+            // Over the black, so the color shows even where the glass is darkest; strongest at the
+            // bottom, like light coming up through the glass. Static layers: nothing redraws per frame.
+            LinearGradient(colors: Theme.glassColor(tint ?? .clear), startPoint: .top, endPoint: .bottom)
+                .opacity(tint == nil ? 0 : 1)
         }
         // An overlay, so the blend's overhang never changes the surface's size.
         .overlay(alignment: .top) {
             if let notch { HardwareBlend(notch: notch, feather: blend) }
         }
-        .background { GlassBackdrop(shape: shape, style: glass) }
+        .background { GlassBackdrop(shape: shape, style: glass, tint: tint) }
     }
 }
 
@@ -111,10 +117,12 @@ private struct HardwareBlend: View {
 private struct GlassBackdrop<S: Shape>: View {
     let shape: S
     let style: GlassStyle
+    var tint: Color?
 
     var body: some View {
         if #available(macOS 26, *) {
-            Color.clear.glassEffect(style == .clear ? .clear : .regular, in: shape)
+            let glass: Glass = style == .clear ? .clear : .regular
+            Color.clear.glassEffect(glass.tint(tint?.opacity(0.35)), in: shape)
         } else {
             BehindWindowBlur()
         }

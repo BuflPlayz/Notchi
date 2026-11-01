@@ -57,8 +57,10 @@ struct NotchContainerView: View {
                     notch: model.geometry.style == .notch ? model.geometry.idleSize : nil,
                     clarity: glassClarity / 100,
                     glass: glassStyle,
-                    blend: notchBlend * (model.state == .expanded ? Metrics.Notch.expandedBlendScale : 1)
+                    blend: notchBlend * (model.state == .expanded ? Metrics.Notch.expandedBlendScale : 1),
+                    tint: surfaceTint
                 )
+                .animation(Motion.content, value: surfaceTint)
             }
             .clipShape(shape)
             .overlay { NotchRim(shape: shape, style: model.geometry.style, brightness: rimBrightness) }
@@ -122,6 +124,11 @@ struct NotchContainerView: View {
     /// notch's edge while the spring settles. The island keeps it: its capsule stays visible at rest.
     private var rimBrightness: Double {
         model.geometry.style == .notch && model.state == .idle ? 0 : edgeHighlight / 100
+    }
+
+    /// The color the activity in the middle asks for, only while the notch shows it.
+    private var surfaceTint: Color? {
+        model.state == .compact ? model.compactModule?.liveActivity?.surfaceTint : nil
     }
 
     /// Only the expanded island casts a shadow: it floats over content instead of blending into hardware.

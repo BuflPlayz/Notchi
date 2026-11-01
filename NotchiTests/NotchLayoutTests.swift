@@ -133,3 +133,12 @@ struct NotchLayoutTests {
         #expect(withRow.hitRect(in: geometry).minY - panel.minY >= Metrics.panelMargin)
     }
 }
+
+struct PanelTabTests {
+    /// Tabs that don't fit left of the notch go right of it instead of under the camera.
+    @Test func tabsSplitAroundTheNotch() {
+        #expect(ExpandedContentView.tabsFitting(sideWidth: 114) == 3)   // 3 × 26 + 2 × 4 = 86; a fourth needs 116
+        #expect(ExpandedContentView.tabsFitting(sideWidth: 146) == 5)
+        #expect(ExpandedContentView.tabsFitting(sideWidth: 0) == 1)
+    }
+}

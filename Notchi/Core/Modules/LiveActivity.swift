@@ -1,4 +1,4 @@
-import CoreGraphics
+import SwiftUI
 
 /// A module's request for compact-mode space beside the notch.
 struct LiveActivity: Equatable, Sendable {
@@ -26,4 +26,7 @@ struct LiveActivity: Equatable, Sendable {
     /// Extra height for a full-width row below the notch (see `NotchModule.compactBelow()`), for
     /// content that belongs to neither side, like the HUD's level bar. 0 keeps compact one row high.
     var belowHeight: CGFloat = 0
+    /// A color the glass takes on while this activity has the middle (and in its bubble), like an
+    /// agent's own color. Nil keeps the glass as the user set it.
+    var surfaceTint: Color? = nil
 }
