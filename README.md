@@ -68,7 +68,19 @@ This builds Release and writes `build/Notchi-<version>.dmg`, holding `Notchi.app
 
 - With no Apple Developer account, use `--adhoc`. The hardened runtime is off then, and other Macs need **Open Anyway**.
 
-Run `scripts/make-dmg.sh --help` for every option. Attach the DMG to a GitHub release to make it the download in [Install](#install).
+Run `scripts/make-dmg.sh --help` for every option.
+
+### Releases
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) builds the DMG on GitHub and publishes it, so it becomes the download in [Install](#install). Bump `MARKETING_VERSION`, then push a matching tag:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+The workflow fails if the tag and the version differ. Running it by hand from the Actions tab builds a DMG you can download from the run, without making a release.
+
+With no secrets set, release DMGs are signed ad hoc. To sign with Developer ID and notarize, add the repository secrets listed at the top of the workflow: the certificate as a base64 `.p12` and its password, plus an App Store Connect API key for notarization.
 
 ## Using Notchi
 

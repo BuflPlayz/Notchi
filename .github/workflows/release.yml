@@ -1,0 +1,159 @@
+# Builds Notchi-<version>.dmg and publishes it as a GitHub release.
+#
+# Release: bump MARKETING_VERSION, then push a matching tag:
+#   git tag v0.1.0 && git push origin v0.1.0
+# Or run it from the Actions tab (Run workflow) to build a DMG you can download
+# from the run's artifacts, without making a release.
+#
+# Signing: with no secrets, the DMG is signed ad hoc and people have to click
+# "Open Anyway" in System Settings › Privacy & Security on first launch. To sign
+# with Developer ID and notarize, add these repository secrets:
+#   DEVELOPER_ID_P12           Developer ID Application certificate + key, .p12, base64
+#   DEVELOPER_ID_P12_PASSWORD  The .p12's password
+#   NOTARY_KEY_P8              App Store Connect API key (.p8), base64
+#   NOTARY_KEY_ID              That key's ID
+#   NOTARY_ISSUER_ID           Its issuer ID
+# (base64 -i file | pbcopy, then paste into Settings › Secrets and variables › Actions.)
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dmg:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode
+        run: xcodebuild -version
+
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(xcodebuild -project Notchi.xcodeproj -target Notchi -configuration Release -showBuildSettings \
+            | awk '$1 == "MARKETING_VERSION" { print $3; exit }')"
+          tag="${GITHUB_REF_NAME#v}"
+          if [[ "$version" != "$tag" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match MARKETING_VERSION $version. Bump the version or retag."
+            exit 1
+          fi
+
+      - name: Set up signing
+        id: signing
+        env:
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          if [[ -z "$P12" ]]; then
+            echo "No Developer ID certificate in secrets; signing ad hoc."
+            echo "mode=adhoc" >> "$GITHUB_OUTPUT"
+            echo "notarized=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$P12_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)"
+          [[ -n "$identity" ]] || { echo "::error::No Developer ID Application identity in DEVELOPER_ID_P12"; exit 1; }
+          team="$(sed -n 's/.*(\([A-Z0-9]*\))$/\1/p' <<< "$identity")"
+          echo "Signing as $identity"
+          notarize=false
+          if [[ -n "$NOTARY_KEY_P8" && -n "$NOTARY_KEY_ID" && -n "$NOTARY_ISSUER_ID" ]]; then
+            echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+            xcrun notarytool store-credentials notchi-notary \
+              --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+              --keychain "$keychain"
+            rm -f "$RUNNER_TEMP/notary.p8"
+            notarize=true
+          else
+            echo "::warning::No notary API key in secrets; the DMG is signed but not notarized."
+          fi
+          {
+            echo "mode=developer-id"
+            echo "identity=$identity"
+            echo "team=$team"
+            echo "notarized=$notarize"
+            echo "keychain=$keychain"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build the DMG
+        id: dmg
+        env:
+          MODE: ${{ steps.signing.outputs.mode }}
+          IDENTITY: ${{ steps.signing.outputs.identity }}
+          TEAM: ${{ steps.signing.outputs.team }}
+          NOTARIZE: ${{ steps.signing.outputs.notarized }}
+          KEYCHAIN: ${{ steps.signing.outputs.keychain }}
+        run: |
+          args=()
+          if [[ "$MODE" == "developer-id" ]]; then
+            args+=(--identity "$IDENTITY" --team "$TEAM")
+            if [[ "$NOTARIZE" == "true" ]]; then
+              args+=(--notarize notchi-notary --keychain "$KEYCHAIN")
+            fi
+          else
+            args+=(--adhoc)
+          fi
+          scripts/make-dmg.sh "${args[@]}"
+
+      - name: Upload the DMG as a run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Notchi-${{ steps.dmg.outputs.version }}
+          path: ${{ steps.dmg.outputs.dmg }}
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DMG: ${{ steps.dmg.outputs.dmg }}
+          NOTARIZED: ${{ steps.signing.outputs.notarized }}
+        run: |
+          {
+            echo "Download **$(basename "$DMG")**, open it, and drag Notchi onto Applications."
+            echo
+            echo "Requires macOS 14 or later on Apple Silicon."
+            if [[ "$NOTARIZED" != "true" ]]; then
+              echo
+              echo "This build isn't notarized. If macOS says it can't check Notchi for malicious software, open System Settings › Privacy & Security and click **Open Anyway**."
+            fi
+          } > "$RUNNER_TEMP/notes.md"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$DMG" \
+              --title "Notchi ${GITHUB_REF_NAME#v}" \
+              --notes-file "$RUNNER_TEMP/notes.md" \
+              --generate-notes
+          fi
+
+      - name: Remove the signing keychain
+        if: always() && steps.signing.outputs.keychain != ''
+        run: security delete-keychain "${{ steps.signing.outputs.keychain }}"

@@ -18,6 +18,8 @@
 #   --notarize <profile>  Notarize and staple the DMG, using a notarytool keychain
 #                         profile (create one with `xcrun notarytool store-credentials`).
 #                         Needs a Developer ID identity.
+#   --keychain <path>     Keychain holding the notarytool profile, if it isn't in
+#                         the search list (CI uses a temporary one).
 #   --adhoc               Sign ad hoc instead (no Apple account needed). The DMG
 #                         works on this Mac; other Macs must allow it in
 #                         System Settings › Privacy & Security.
@@ -34,6 +36,7 @@ STAGING="$BUILD_DIR/dmg-staging"
 IDENTITY=""
 TEAM=""
 NOTARY_PROFILE=""
+NOTARY_KEYCHAIN=""
 ADHOC=0
 
 usage() { sed -n '2,/^$/s/^# \{0,1\}//p' "$0"; }
@@ -45,6 +48,7 @@ while [[ $# -gt 0 ]]; do
         --identity) IDENTITY="${2:?--identity needs a value}"; shift 2 ;;
         --team) TEAM="${2:?--team needs a value}"; shift 2 ;;
         --notarize) NOTARY_PROFILE="${2:?--notarize needs a keychain profile}"; shift 2 ;;
+        --keychain) NOTARY_KEYCHAIN="${2:?--keychain needs a path}"; shift 2 ;;
         --adhoc) ADHOC=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) die "unknown option: $1 (see --help)" ;;
@@ -113,7 +117,10 @@ hdiutil attach -quiet -nobrowse -noautoopen -mountpoint "$MOUNT_DIR" "$RW_DMG"
 detach() { hdiutil detach -quiet "$MOUNT_DIR" 2>/dev/null || hdiutil detach -quiet -force "$MOUNT_DIR" || true; }
 trap detach EXIT
 
-if ! osascript >/dev/null <<EOF
+# Finder may ask for Automation permission and wait forever when nobody is
+# there to answer (CI), so give up after a minute.
+LAYOUT_SCRIPT="$BUILD_DIR/dmg-layout.applescript"
+cat > "$LAYOUT_SCRIPT" <<EOF
 tell application "Finder"
     set dmgFolder to (POSIX file "$MOUNT_DIR") as alias
     open dmgFolder
@@ -134,9 +141,16 @@ tell application "Finder"
     close w
 end tell
 EOF
-then
+osascript "$LAYOUT_SCRIPT" >/dev/null &
+OSA_PID=$!
+( sleep 60; kill "$OSA_PID" 2>/dev/null ) >/dev/null 2>&1 &
+WATCHDOG_PID=$!
+if ! wait "$OSA_PID"; then
     echo "warning: couldn't arrange the Finder window; using the default layout" >&2
 fi
+pkill -P "$WATCHDOG_PID" 2>/dev/null || true
+kill "$WATCHDOG_PID" 2>/dev/null || true
+rm -f "$LAYOUT_SCRIPT"
 sync
 detach
 trap - EXIT
@@ -153,10 +167,16 @@ fi
 
 if [[ -n "$NOTARY_PROFILE" ]]; then
     step "Notarizing (this can take a few minutes)"
-    xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+    NOTARY_ARGS=(--keychain-profile "$NOTARY_PROFILE")
+    [[ -n "$NOTARY_KEYCHAIN" ]] && NOTARY_ARGS+=(--keychain "$NOTARY_KEYCHAIN")
+    xcrun notarytool submit "$DMG" "${NOTARY_ARGS[@]}" --wait
     xcrun stapler staple "$DMG"
     spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
 fi
 
 step "Done"
+# GitHub Actions: expose the DMG path and version to later steps.
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    { echo "dmg=$DMG"; echo "version=$VERSION"; } >> "$GITHUB_OUTPUT"
+fi
 echo "$DMG"
