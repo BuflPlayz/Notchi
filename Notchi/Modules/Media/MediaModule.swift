@@ -12,6 +12,8 @@ final class MediaModule: NotchModule {
 
     private(set) var info: NowPlayingInfo?
     private(set) var artwork: NSImage?
+    /// The artwork blurred into the glow behind it on the media page, drawn once per track.
+    private(set) var artworkGlow: NSImage?
     /// Accent derived from the artwork; white when there's no artwork or it's grayscale.
     private(set) var accent: Color = Theme.primary
     private(set) var liveActivity: LiveActivity?
@@ -157,21 +159,26 @@ final class MediaModule: NotchModule {
         }
     }
 
-    /// Decodes artwork and its accent color off the main actor.
+    /// Decodes artwork, its glow and its accent color off the main actor.
     private func loadArtwork(_ data: Data?) {
         artworkTask?.cancel()
         guard let data else {
             withAnimation(Motion.content) {
                 artwork = nil
+                artworkGlow = nil
                 accent = Theme.primary
             }
             return
         }
         artworkTask = Task { [weak self] in
-            let decoded = await Task.detached(priority: .utility) { ArtworkPalette.decode(data) }.value
+            let (decoded, glow) = await Task.detached(priority: .utility) {
+                let decoded = ArtworkPalette.decode(data)
+                return (decoded, decoded.flatMap { ArtworkPalette.glow(from: $0.image) })
+            }.value
             guard let self, !Task.isCancelled else { return }
             withAnimation(Motion.content) {
                 self.artwork = decoded.map { NSImage(cgImage: $0.image, size: .zero) }
+                self.artworkGlow = glow.map { NSImage(cgImage: $0, size: .zero) }
                 self.accent = decoded?.accent.map { Color(.sRGB, red: $0.red, green: $0.green, blue: $0.blue) } ?? Theme.primary
             }
         }

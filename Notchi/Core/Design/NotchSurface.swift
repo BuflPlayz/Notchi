@@ -71,21 +71,18 @@ struct NotchRim<S: Shape>: View {
                 LinearGradient(colors: Theme.glassRim(brightness: brightness), startPoint: .top, endPoint: .bottom),
                 lineWidth: 1.5
             )
+            // One mask, not two: each is another offscreen pass on every frame the outline animates.
             .mask {
-                // Notch style: leave out the flat top edge, which would draw a line along the bezel.
                 VStack(spacing: 0) {
+                    // Notch style: leave out the flat top edge, which would draw a line along the bezel.
                     Color.clear.frame(height: style == .notch ? overhang + 1 : 0)
-                    Color.black
+                    if let notchFade {
+                        LinearGradient(stops: notchFade.stops(overhang: overhang), startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Color.black
+                    }
                 }
                 .padding(-overhang)
-            }
-            .mask {
-                if let notchFade {
-                    LinearGradient(stops: notchFade.stops(overhang: overhang), startPoint: .leading, endPoint: .trailing)
-                        .padding(-overhang)
-                } else {
-                    Color.black.padding(-overhang)
-                }
             }
             .opacity(brightness > 0 ? 1 : 0)
             .allowsHitTesting(false)

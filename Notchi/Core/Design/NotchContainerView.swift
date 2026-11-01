@@ -66,7 +66,12 @@ struct NotchContainerView: View {
             .overlay { NotchRim(shape: shape, style: model.geometry.style, brightness: rimBrightness, notchFade: rimFade(layout: layout)) }
             .swapPulse(trigger: reduceMotion ? 0 : model.swapCount)
             .contentShape(shape)
-            .shadow(color: .black.opacity(islandShadowOpacity), radius: 18, y: 8)
+            .background {
+                if model.geometry.style == .island && model.state == .expanded {
+                    IslandShadow(shape: shape)
+                        .transition(.opacity)
+                }
+            }
             .opacity(isHiddenAtRest ? 0 : 1)
             .animation(Motion.content, value: isHiddenAtRest)
             // Only the surface opens the panel; the bubbles beside it swap instead.
@@ -136,10 +141,26 @@ struct NotchContainerView: View {
         guard model.geometry.style == .notch else { return nil }
         return NotchRimFade(notch: model.geometry.idleSize, shapeWidth: layout.size.width, height: layout.size.height)
     }
+}
 
-    /// Only the expanded island casts a shadow: it floats over content instead of blending into hardware.
-    private var islandShadowOpacity: Double {
-        model.geometry.style == .island && model.state == .expanded ? 0.45 : 0
+/// The expanded island's shadow (it floats over content instead of blending into hardware), cast
+/// by its outline alone. A `.shadow` on the surface itself would render the glass and everything on
+/// it a second time, offscreen, whenever any of it redraws: the visualizer, a mascot, the clock.
+private struct IslandShadow: View {
+    let shape: NotchShape
+
+    var body: some View {
+        shape
+            .fill(.black)
+            .shadow(color: .black.opacity(0.45), radius: 18, y: 8)
+            // Only the part outside the outline: the glass is see-through.
+            .mask {
+                Rectangle()
+                    .padding(-60)
+                    .overlay { shape.blendMode(.destinationOut) }
+                    .compositingGroup()
+            }
+            .allowsHitTesting(false)
     }
 }
 

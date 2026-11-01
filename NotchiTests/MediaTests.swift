@@ -131,6 +131,13 @@ struct ArtworkPaletteTests {
         #expect(decoded.image.width <= 64)
         #expect(decoded.accent != nil)
     }
+
+    @Test func glowLeavesRoomForTheBlur() throws {
+        let glow = try #require(ArtworkPalette.glow(from: image(base: RGB(red: 0.8, green: 0.1, blue: 0.1)), side: 84, blurRadius: 16))
+        #expect(glow.width == 84 + 2 * 48 && glow.height == glow.width)
+        let corner = try #require(glow.dataProvider?.data as Data?)
+        #expect(corner[3] == 0)                                      // the fade is gone by the edge
+    }
 }
 
 @MainActor

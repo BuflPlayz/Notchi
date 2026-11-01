@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import Foundation
 import ImageIO
 
@@ -23,6 +24,23 @@ enum ArtworkPalette {
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options)
         else { return nil }
         return (image, accent(from: image))
+    }
+
+    /// The artwork squeezed to `side` points square and blurred by `blurRadius`, at one pixel per point,
+    /// with room around it for the blur to fade out. Drawing this once per track replaces a live
+    /// SwiftUI blur, which the GPU redoes on every frame the artwork moves (opening the panel, for one).
+    /// Pure and thread-safe; call it off the main actor.
+    static func glow(from image: CGImage, side: CGFloat = 84, blurRadius: CGFloat = 16) -> CGImage? {
+        let input = CIImage(cgImage: image)
+        guard input.extent.width > 0, input.extent.height > 0 else { return nil }
+        let squeezed = input.transformed(by: CGAffineTransform(
+            scaleX: side / input.extent.width,
+            y: side / input.extent.height
+        ))
+        let padding = (blurRadius * 3).rounded(.up)
+        let canvas = CGRect(x: -padding, y: -padding, width: side + 2 * padding, height: side + 2 * padding)
+        return CIContext(options: [.cacheIntermediates: false])
+            .createCGImage(squeezed.applyingGaussianBlur(sigma: blurRadius), from: canvas)
     }
 
     /// The most common vivid hue family in the image, lifted so it reads on black.

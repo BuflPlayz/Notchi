@@ -44,12 +44,11 @@ private struct NowPlayingView: View {
                 .notchMatchedGeometry(id: "media.artwork")
                 .background {
                     // The artwork's own colors, blurred, as a subtle glow on the black surface.
-                    if let image = module.artwork {
-                        Image(nsImage: image)
-                            .resizable()
-                            .frame(width: 84, height: 84)
-                            .blur(radius: 16)
+                    // Pre-blurred at its natural size, which already includes room for the fade.
+                    if let glow = module.artworkGlow {
+                        Image(nsImage: glow)
                             .opacity(0.45)
+                            .allowsHitTesting(false)
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
