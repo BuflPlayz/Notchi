@@ -10,9 +10,15 @@ enum HUDMetrics {
     static let inset: CGFloat = 12
     /// Distance from the notch to the content beside it: the number's right edge, the bar's left end.
     static let notchGap: CGFloat = 8
+    /// The icon's box (the speaker, the widest of the two).
+    static let iconWidth: CGFloat = 22
+    /// The least room between the icon and the number.
+    static let valueSpacing: CGFloat = 4
+    /// The widest number, "100", in the HUD's 13 pt semibold monospaced digits, with a little spare.
+    static let valueWidth: CGFloat = 27
     /// Compact slot width the HUD asks for: room for the icon and the number on one side, and a
     /// bar of the same length on the other.
-    static let sideWidth: CGFloat = 66
+    static let sideWidth: CGFloat = inset + iconWidth + valueSpacing + valueWidth + notchGap
     static let barHeight: CGFloat = 6
 }
 
@@ -93,7 +99,7 @@ private struct HUDLeading<Icon: View>: View {
     var body: some View {
         HStack(spacing: 0) {
             icon
-            Spacer(minLength: 4)
+            Spacer(minLength: HUDMetrics.valueSpacing)
             HUDValue(value: value, isMuted: isMuted)
         }
         .padding(.trailing, HUDMetrics.notchGap)
@@ -125,6 +131,9 @@ struct HUDValue: View {
             .font(.system(size: 13, weight: .semibold).monospacedDigit())
             .foregroundStyle(isMuted ? Theme.tertiary : Theme.primary)
             .contentTransition(.numericText(value: Double(percent)))
+            // Never wraps ("10" over "0"): if a slot is ever too narrow, it runs toward the notch instead.
+            .lineLimit(1)
+            .fixedSize()
     }
 }
 
@@ -157,7 +166,7 @@ struct VolumeHUDIcon: View {
             .foregroundStyle(Theme.primary)
             .contentTransition(.symbolEffect(.replace))
             .symbolEffect(.bounce, value: isMuted)
-            .frame(width: 22, alignment: .leading)
+            .frame(width: HUDMetrics.iconWidth, alignment: .leading)
     }
 }
 
