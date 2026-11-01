@@ -24,6 +24,16 @@ On a notched MacBook display, Notchi grows out of the camera notch. On a main di
 - macOS 14 or later, Apple Silicon
 - Xcode 26 or later to build (the app icon is an Icon Composer document); developed with Xcode 27.1
 
+## Install
+
+1. Download `Notchi-<version>.dmg` from the [latest release](https://github.com/buflplayz/notchi/releases/latest).
+2. Open the DMG and drag **Notchi** onto the **Applications** folder.
+3. Eject the disk image and open Notchi from Applications or Launchpad.
+
+If macOS says Notchi can't be opened because it couldn't check it for malicious software, go to System Settings › Privacy & Security and click **Open Anyway**. This happens with builds that aren't notarized.
+
+To uninstall, quit Notchi (right-click the notch › Quit) and move it from Applications to the Trash.
+
 ## Build and run
 
 Open `Notchi.xcodeproj` in Xcode and press ⌘R. Or from a terminal:
@@ -39,6 +49,26 @@ open ~/Library/Developer/Xcode/DerivedData/Notchi-*/Build/Products/Debug/Notchi.
 The project is signed with an Apple Development identity, so macOS permissions survive rebuilds. To build on another machine, set your own team under Signing & Capabilities.
 
 Keep build output out of iCloud-synced folders such as `~/Documents`. iCloud adds file attributes that make `codesign` fail with "resource fork, Finder information, or similar detritus not allowed". Xcode's default DerivedData location is fine.
+
+## Make the DMG
+
+```bash
+scripts/make-dmg.sh
+```
+
+This builds Release and writes `build/Notchi-<version>.dmg`, holding `Notchi.app`, an `Applications` shortcut to drag it onto, and the license. The version comes from `MARKETING_VERSION`.
+
+- By default it signs with the project's Apple Development identity. That's fine for your own Macs.
+- For a public release, sign with Developer ID and notarize, so it opens without Gatekeeper warnings:
+
+  ```bash
+  xcrun notarytool store-credentials notchi-notary   # once: Apple ID, team, app-specific password
+  scripts/make-dmg.sh --identity "Developer ID Application: Your Name (TEAMID)" --notarize notchi-notary
+  ```
+
+- With no Apple Developer account, use `--adhoc`. The hardened runtime is off then, and other Macs need **Open Anyway**.
+
+Run `scripts/make-dmg.sh --help` for every option. Attach the DMG to a GitHub release to make it the download in [Install](#install).
 
 ## Using Notchi
 
