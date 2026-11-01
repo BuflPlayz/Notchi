@@ -78,7 +78,9 @@ Run `scripts/make-dmg.sh --help` for every option.
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-The workflow fails if the tag and the version differ. Running it by hand from the Actions tab builds a DMG you can download from the run, without making a release.
+The workflow fails if the tag and the version differ.
+
+No terminal handy (on a phone, say)? Open the **Actions** tab, pick **Release** and tap **Run workflow**. It publishes release `v<MARKETING_VERSION>` and creates the tag. Untick **Publish a release** to only build a DMG you can download from the run.
 
 With no secrets set, release DMGs are signed ad hoc. To sign with Developer ID and notarize, add the repository secrets listed at the top of the workflow: the certificate as a base64 `.p12` and its password, plus an App Store Connect API key for notarization.
 

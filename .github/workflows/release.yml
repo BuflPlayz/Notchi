@@ -2,8 +2,9 @@
 #
 # Release: bump MARKETING_VERSION, then push a matching tag:
 #   git tag v0.1.0 && git push origin v0.1.0
-# Or run it from the Actions tab (Run workflow) to build a DMG you can download
-# from the run's artifacts, without making a release.
+# Or tap Run workflow in the Actions tab (works from a phone): it publishes
+# release v<MARKETING_VERSION>, creating the tag. Untick "Publish a release" to
+# only build a DMG you can download from the run's artifacts.
 #
 # Signing: with no secrets, the DMG is signed ad hoc and people have to click
 # "Open Anyway" in System Settings › Privacy & Security on first launch. To sign
@@ -21,6 +22,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a release (tag v<MARKETING_VERSION>)
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -129,12 +135,21 @@ jobs:
           if-no-files-found: error
 
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
           DMG: ${{ steps.dmg.outputs.dmg }}
+          VERSION: ${{ steps.dmg.outputs.version }}
           NOTARIZED: ${{ steps.signing.outputs.notarized }}
         run: |
+          # A tag push releases that tag; Run workflow releases v<version>,
+          # and creating the release creates the tag at this commit.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$VERSION"
+          fi
+
           {
             echo "Download **$(basename "$DMG")**, open it, and drag Notchi onto Applications."
             echo
@@ -145,11 +160,12 @@ jobs:
             fi
           } > "$RUNNER_TEMP/notes.md"
 
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$DMG" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$DMG" \
-              --title "Notchi ${GITHUB_REF_NAME#v}" \
+            gh release create "$tag" "$DMG" \
+              --target "$GITHUB_SHA" \
+              --title "Notchi ${tag#v}" \
               --notes-file "$RUNNER_TEMP/notes.md" \
               --generate-notes
           fi
