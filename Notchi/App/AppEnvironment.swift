@@ -16,7 +16,10 @@ final class AppEnvironment {
     }
 
     init() {
-        // Order breaks priority ties: a running Clock timer takes the compact slots over playing music.
+        // Order breaks priority ties: a call takes the compact slots over a recording, a recording
+        // over a running Clock timer, and a timer over playing music.
+        registry.register(CallsModule())
+        registry.register(CaptureModule())
         registry.register(ClockModule(provider: MobileTimerClockProvider()))
         // Coding agents at work, one live activity per running session.
         registry.register(AgentsModule())
@@ -72,7 +75,9 @@ final class AppEnvironment {
     /// Commands: `expand`, `collapse`, `show:<module id>` (open a module's page), `settings`,
     /// `swap:<module id>` (click that module's bubble beside the notch), `focus:<name>` / `focus:off`,
     /// `agent:<claude|codex|gemini>:<working|thinking|plan|waiting|done|failed>` / `agent:clear` (fake sessions),
-    /// `hud:charging:0.76` / `hud:low:0.1` (battery toasts), `focusDump` / `focusTrace` (what the Focus
+    /// `hud:charging:0.76` / `hud:low:0.1` (battery toasts), `call:incoming:<name>` / `call:active:<bundle id>` /
+    /// `call:end` (fake calls), `rec:screen` / `rec:audio` / `rec:off` (fake recordings), `callDump` (Notification
+    /// Center's windows, to see how a call's alert is built, written to `$TMPDIR`), `focusDump` / `focusTrace` (what the Focus
     /// monitor sees, written to `$TMPDIR`),
     /// `settings:<tab>` (general, modules, clock, media, system, about), `closeSettings`, `hud:volume:0.6` / `hud:brightness:0.3` / `hud:mute`, `audioTap` (runs the visualizer's audio tap for 6 s and logs
     /// the result under subsystem `dev.notchi.Notchi`, category `AudioTap`).
@@ -101,6 +106,13 @@ final class AppEnvironment {
                     try? FocusMonitor.debugDump().write(toFile: path, atomically: true, encoding: .utf8)
                 case let command? where command.hasPrefix("focus:"):
                     (self?.registry.module(withID: "focus") as? FocusModule)?.showDebugFocus(String(command.dropFirst("focus:".count)))
+                case let command? where command.hasPrefix("call:"):
+                    (self?.registry.module(withID: "calls") as? CallsModule)?.showDebugCall(String(command.dropFirst("call:".count)))
+                case let command? where command.hasPrefix("rec:"):
+                    (self?.registry.module(withID: "recording") as? CaptureModule)?.showDebugRecording(String(command.dropFirst("rec:".count)))
+                case "callDump":
+                    let path = FileManager.default.temporaryDirectory.appending(path: "notchi-call-dump.txt").path
+                    try? IncomingCallMonitor.debugDump().write(toFile: path, atomically: true, encoding: .utf8)
                 case let command? where command.hasPrefix("agent:"):
                     (self?.registry.module(withID: "agents") as? AgentsModule)?.showDebugAgent(String(command.dropFirst("agent:".count)))
                 case let command? where command.hasPrefix("swap:"):

@@ -12,6 +12,8 @@ On a notched MacBook display, Notchi grows out of the camera notch. On a main di
 
 - **Live activities, stacked.** The main activity sits in the notch; up to two more float beside it as detached bubbles. Click a bubble to swap it into the middle with a warp, like the iPhone's Dynamic Island.
 - **Now Playing.** Music, Spotify, Podcasts and other music apps (browsers and video apps optional): artwork, a real audio visualizer, progress with seeking, and transport controls.
+- **Calls.** FaceTime, Phone, Zoom, Teams, Slack, Discord and calls in a browser: a green phone (a camera for video) and the call's running time. Open the notch to mute the microphone for every app or jump to the call. A ringing FaceTime or iPhone call takes the middle with the caller's name, and the open notch answers or declines it, like the iPhone. "Ended" shows when it's over.
+- **Recording.** While the screen is recorded or shared, a pulsing red dot and the time; a ⇧⌘5 recording can be stopped from the notch. Apps recording audio, like Voice Memos, show an orange microphone.
 - **Clock timers.** Running and paused timers and the stopwatch from Apple's Clock app, with a "Done" toast when a timer ends.
 - **Volume and brightness HUD.** Replaces the system's, in the notch's own row: icon and percentage on the left, the level bar on the right.
 - **Battery.** Charging and low-battery toasts with a battery drawn to its real level.
@@ -98,7 +100,7 @@ Notchi asks only when a feature needs it.
 
 | Permission | Used for |
 |---|---|
-| Accessibility | Replacing the volume and brightness HUD (the media keys), and seeing which Focus is on (the menu bar's Focus item) |
+| Accessibility | Replacing the volume and brightness HUD (the media keys), seeing which Focus is on (the menu bar's Focus item), incoming calls (Notification Center's call alert), and stopping a screen recording |
 | System Audio Recording | The real audio visualizer, only while music plays. Audio is analyzed live, never recorded. |
 | Automation (Music, Spotify) | Controls and artwork, only if the system Now Playing service isn't available |
 
@@ -125,6 +127,9 @@ xcodebuild -project Notchi.xcodeproj -scheme Notchi test
   | `hud:volume:0.6`, `hud:brightness:0.3`, `hud:mute` | Shows the HUD without pressing keys |
   | `hud:charging:0.76`, `hud:low:0.1` | Shows a battery toast |
   | `focus:<name>`, `focus:off` | Pretends a Focus turned on or off |
+  | `call:incoming:<name>`, `call:active:<bundle id>`, `call:end` | Fakes a ringing call, a call in an app (default FaceTime), or ends it |
+  | `rec:screen`, `rec:audio`, `rec:off` | Fakes a screen recording or an app recording audio, or stops the fakes |
+  | `callDump` | Writes Notification Center's windows to `$TMPDIR/notchi-call-dump.txt`, to see how a call's alert is built |
   | `agent:<claude\|codex\|gemini>:<state>`, `agent:clear` | Fakes an agent session (`working`, `thinking`, `plan`, `waiting`, `done`, `failed`), or removes the fakes |
   | `focusDump`, `focusTrace` | Writes what the Focus monitor sees (a snapshot, or a 40 s timed trace) to `$TMPDIR` |
   | `settings`, `settings:<tab>`, `closeSettings` | Opens Settings (at `general`, `modules`, a module's tab, or `about`), or closes it |
@@ -138,6 +143,7 @@ xcodebuild -project Notchi.xcodeproj -scheme Notchi test
 - [x] Shelf for dropped files
 - [ ] Notchi's own stopwatch and timer
 - [x] Coding agents: Claude Code, Codex and Gemini CLI, with their mascots
+- [x] Calls (ongoing and incoming) and screen and audio recording
 - [ ] AirPods and output-device toasts, clipboard
 
 ## License

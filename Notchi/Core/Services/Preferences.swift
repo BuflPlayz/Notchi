@@ -33,6 +33,11 @@ enum Preferences {
         static let agentAnnouncesDone = "agentAnnouncesDone"
         static let agentShowsStep = "agentShowsStep"
         static let agentTintsGlass = "agentTintsGlass"
+        static let callsShowIncoming = "callsShowIncoming"
+        static let callsIncludeBrowsers = "callsIncludeBrowsers"
+        static let callsAnnounceEnd = "callsAnnounceEnd"
+        static let recordingShowsScreen = "recordingShowsScreen"
+        static let recordingShowsMicrophone = "recordingShowsMicrophone"
         /// Debug: draw the Dynamic Island even on a notched display. Launch with `-NotchiForceIsland YES`.
         static let forceIsland = "NotchiForceIsland"
     }
@@ -45,6 +50,7 @@ enum Preferences {
         Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
         Key.compactAlignment, Key.compactLip, Key.openAnimation, Key.openDuration, Key.openBounce,
         Key.agentAnnouncesDone, Key.agentShowsStep, Key.agentTintsGlass,
+        Key.callsShowIncoming, Key.callsIncludeBrowsers, Key.callsAnnounceEnd, Key.recordingShowsScreen, Key.recordingShowsMicrophone,
     ]
 
     static func registerDefaults() {
@@ -78,6 +84,11 @@ enum Preferences {
             Key.agentAnnouncesDone: true,
             Key.agentShowsStep: false,
             Key.agentTintsGlass: true,
+            Key.callsShowIncoming: true,
+            Key.callsIncludeBrowsers: true,
+            Key.callsAnnounceEnd: true,
+            Key.recordingShowsScreen: true,
+            Key.recordingShowsMicrophone: true,
             Key.forceIsland: false,
         ])
     }
@@ -143,6 +154,16 @@ enum Preferences {
     static var agentShowsStep: Bool { value(Key.agentShowsStep, default: false) }
     /// The notch's glass takes on the color of the agent in it.
     static var agentTintsGlass: Bool { value(Key.agentTintsGlass, default: true) }
+    /// A FaceTime or iPhone call ringing takes the middle of the notch (needs Accessibility).
+    static var callsShowIncoming: Bool { value(Key.callsShowIncoming, default: true) }
+    /// A browser using the microphone counts as a call (Meet, Teams on the web).
+    static var callsIncludeBrowsers: Bool { value(Key.callsIncludeBrowsers, default: true) }
+    /// A short "Ended" toast when a call ends.
+    static var callsAnnounceEnd: Bool { value(Key.callsAnnounceEnd, default: true) }
+    /// A red dot and the time while the screen is recorded or shared.
+    static var recordingShowsScreen: Bool { value(Key.recordingShowsScreen, default: true) }
+    /// An orange mic and the time while an app (not a call) records from the microphone.
+    static var recordingShowsMicrophone: Bool { value(Key.recordingShowsMicrophone, default: true) }
     /// How far the closed notch reaches below the physical one while it shows a live activity, in
     /// points: 0 is flush with the camera housing.
     static var compactLip: CGFloat { CGFloat(value(Key.compactLip, default: Double(Metrics.Notch.compactBottomLip))) }
