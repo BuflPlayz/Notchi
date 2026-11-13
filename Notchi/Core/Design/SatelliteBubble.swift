@@ -6,9 +6,9 @@ struct SatelliteBubble: View {
     let module: any NotchModule
     let diameter: CGFloat
     let action: () -> Void
-    @AppStorage(Preferences.Key.glassClarity) private var glassClarity = 85.0
+    @AppStorage(Preferences.Key.glassClarity) private var glassClarity = Preferences.Default.glassClarity
     @AppStorage(Preferences.Key.glassStyle) private var glassStyle = GlassStyle.clear
-    @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = 60.0
+    @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = Preferences.Default.edgeHighlight
 
     var body: some View {
         Button(action: action) {

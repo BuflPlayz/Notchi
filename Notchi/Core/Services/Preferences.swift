@@ -43,6 +43,26 @@ enum Preferences {
         static let forceIsland = "NotchiForceIsland"
     }
 
+    /// Default values for the settings whose defaults aren't the layout's reference sizes in
+    /// `Metrics`. Shared by `registerDefaults`, the accessors below and the views' `@AppStorage`.
+    enum Default {
+        static let expandDelay = 0.25
+        static let collapseDelay = 0.0
+        static let compactSideWidth = 42.0
+        static let expandedWidth = 530.0
+        static let islandVisibleWhenIdle = false
+        static let glassClarity = 100.0
+        static let edgeHighlight = 30.0
+        static let notchBlend = 60.0
+        static let notchCornerRadius = 48.0
+        static let notchTopCurve = 28.0
+        static let compactLip = 0.5
+        static let openDuration = 0.15
+        static let openBounce = 60.0
+        static let agentTintsGlass = false
+        static let callsIncludeBrowsers = false
+    }
+
     /// Every key Notchi stores, for "Reset All Settings".
     static let allKeys = [
         Key.expandDelay, Key.collapseDelay, Key.hapticsEnabled, Key.compactSideWidth, Key.expandedWidth,
@@ -56,11 +76,11 @@ enum Preferences {
 
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
-            Key.expandDelay: 0.15,
-            Key.collapseDelay: 0.3,
+            Key.expandDelay: Default.expandDelay,
+            Key.collapseDelay: Default.collapseDelay,
             Key.hapticsEnabled: true,
-            Key.compactSideWidth: Double(Metrics.compactSideWidth),
-            Key.expandedWidth: Double(Metrics.expandedWidth),
+            Key.compactSideWidth: Default.compactSideWidth,
+            Key.expandedWidth: Default.expandedWidth,
             Key.showAllMediaSources: false,
             Key.realAudioVisualizer: true,
             Key.replaceSystemHUD: true,
@@ -68,26 +88,26 @@ enum Preferences {
             Key.focusAlerts: true,
             Key.focusActivity: false,
             Key.openOnHover: true,
-            Key.islandVisibleWhenIdle: true,
+            Key.islandVisibleWhenIdle: Default.islandVisibleWhenIdle,
             Key.clockShowsPaused: true,
             Key.hideInFullScreen: true,
             Key.menuBarSafeZone: true,
-            Key.glassClarity: 85.0,
-            Key.edgeHighlight: 60.0,
+            Key.glassClarity: Default.glassClarity,
+            Key.edgeHighlight: Default.edgeHighlight,
             Key.glassStyle: GlassStyle.clear.rawValue,
-            Key.notchBlend: Double(Metrics.Notch.hardwareBlend),
-            Key.notchCornerRadius: Double(Metrics.Notch.expandedBottomRadius),
-            Key.notchTopCurve: Double(Metrics.Notch.expandedTopRadius),
+            Key.notchBlend: Default.notchBlend,
+            Key.notchCornerRadius: Default.notchCornerRadius,
+            Key.notchTopCurve: Default.notchTopCurve,
             Key.compactAlignment: CompactAlignment.center.rawValue,
-            Key.compactLip: Double(Metrics.Notch.compactBottomLip),
+            Key.compactLip: Default.compactLip,
             Key.openAnimation: OpenAnimation.snappy.rawValue,
-            Key.openDuration: 0.35,
-            Key.openBounce: 22.0,
+            Key.openDuration: Default.openDuration,
+            Key.openBounce: Default.openBounce,
             Key.agentAnnouncesDone: true,
             Key.agentShowsStep: false,
-            Key.agentTintsGlass: true,
+            Key.agentTintsGlass: Default.agentTintsGlass,
             Key.callsShowIncoming: true,
-            Key.callsIncludeBrowsers: true,
+            Key.callsIncludeBrowsers: Default.callsIncludeBrowsers,
             Key.callsAnnounceEnd: true,
             Key.recordingShowsScreen: true,
             Key.recordingShowsMicrophone: true,
@@ -96,13 +116,13 @@ enum Preferences {
     }
 
     /// Hover dwell before expanding, so passing the cursor over the notch doesn't open it.
-    static var expandDelay: Double { value(Key.expandDelay, default: 0.15) }
+    static var expandDelay: Double { value(Key.expandDelay, default: Default.expandDelay) }
     /// Grace period after the cursor leaves before collapsing.
-    static var collapseDelay: Double { value(Key.collapseDelay, default: 0.3) }
+    static var collapseDelay: Double { value(Key.collapseDelay, default: Default.collapseDelay) }
     /// Width of each compact slot beside the notch, in points.
-    static var compactSideWidth: CGFloat { CGFloat(value(Key.compactSideWidth, default: Double(Metrics.compactSideWidth))) }
+    static var compactSideWidth: CGFloat { CGFloat(value(Key.compactSideWidth, default: Default.compactSideWidth)) }
     /// Width of the expanded panel, in points.
-    static var expandedWidth: CGFloat { CGFloat(value(Key.expandedWidth, default: Double(Metrics.expandedWidth))) }
+    static var expandedWidth: CGFloat { CGFloat(value(Key.expandedWidth, default: Default.expandedWidth)) }
     static var hapticsEnabled: Bool { value(Key.hapticsEnabled, default: true) }
     /// Off: only music apps (see `MediaSourceFilter`). On: browsers and video players too.
     static var showAllMediaSources: Bool { value(Key.showAllMediaSources, default: false) }
@@ -115,7 +135,7 @@ enum Preferences {
     /// Off: the notch only opens on click.
     static var openOnHover: Bool { value(Key.openOnHover, default: true) }
     /// Island style only: keep the small capsule visible at rest, like iPhone. Off hides it until needed.
-    static var islandVisibleWhenIdle: Bool { value(Key.islandVisibleWhenIdle, default: true) }
+    static var islandVisibleWhenIdle: Bool { value(Key.islandVisibleWhenIdle, default: Default.islandVisibleWhenIdle) }
     /// Hide the notch while a full-screen app is in front (the volume and brightness HUD still shows).
     static var hideInFullScreen: Bool { value(Key.hideInFullScreen, default: true) }
     /// The live activity tucks back into the notch while the pointer is on the menu bar icons it covers.
@@ -127,27 +147,27 @@ enum Preferences {
     /// Keep an active Focus in the notch as a quiet live activity (needs Accessibility).
     static var focusActivity: Bool { value(Key.focusActivity, default: false) }
     /// How see-through the surface is, in percent: 0 is solid black, 100 is as clear as the glass gets.
-    static var glassClarity: Double { value(Key.glassClarity, default: 85.0) }
+    static var glassClarity: Double { value(Key.glassClarity, default: Default.glassClarity) }
     /// Brightness of the light rim around the surface, in percent. 0 turns it off.
-    static var edgeHighlight: Double { value(Key.edgeHighlight, default: 60.0) }
+    static var edgeHighlight: Double { value(Key.edgeHighlight, default: Default.edgeHighlight) }
     /// How far the notch's black fades out into the glass, in points (notch style only).
-    static var notchBlend: Double { value(Key.notchBlend, default: Double(Metrics.Notch.hardwareBlend)) }
+    static var notchBlend: Double { value(Key.notchBlend, default: Default.notchBlend) }
     /// Bottom corner radius of the opened notch, in points (compact scales along).
     static var notchCornerRadius: CGFloat {
-        CGFloat(value(Key.notchCornerRadius, default: Double(Metrics.Notch.expandedBottomRadius)))
+        CGFloat(value(Key.notchCornerRadius, default: Default.notchCornerRadius))
     }
     /// Radius of the concave curves where the opened notch meets the top bezel, in points.
     static var notchTopCurve: CGFloat {
-        CGFloat(value(Key.notchTopCurve, default: Double(Metrics.Notch.expandedTopRadius)))
+        CGFloat(value(Key.notchTopCurve, default: Default.notchTopCurve))
     }
     /// How the notch springs open.
     static var openAnimation: OpenAnimation {
         OpenAnimation(rawValue: value(Key.openAnimation, default: "")) ?? .snappy
     }
     /// Custom open animation: spring response, in seconds.
-    static var openDuration: Double { value(Key.openDuration, default: 0.35) }
+    static var openDuration: Double { value(Key.openDuration, default: Default.openDuration) }
     /// Custom open animation: overshoot, in percent (0 is none).
-    static var openBounce: Double { value(Key.openBounce, default: 22.0) }
+    static var openBounce: Double { value(Key.openBounce, default: Default.openBounce) }
     /// Where live activity content sits in the compact slots beside the notch.
     static var compactAlignment: CompactAlignment {
         CompactAlignment(rawValue: value(Key.compactAlignment, default: "")) ?? .center
@@ -157,11 +177,11 @@ enum Preferences {
     /// A row under the notch with what a running agent is doing ("Editing NotchShape.swift").
     static var agentShowsStep: Bool { value(Key.agentShowsStep, default: false) }
     /// The notch's glass takes on the color of the agent in it.
-    static var agentTintsGlass: Bool { value(Key.agentTintsGlass, default: true) }
+    static var agentTintsGlass: Bool { value(Key.agentTintsGlass, default: Default.agentTintsGlass) }
     /// A FaceTime or iPhone call ringing takes the middle of the notch (needs Accessibility).
     static var callsShowIncoming: Bool { value(Key.callsShowIncoming, default: true) }
     /// A browser using the microphone counts as a call (Meet, Teams on the web).
-    static var callsIncludeBrowsers: Bool { value(Key.callsIncludeBrowsers, default: true) }
+    static var callsIncludeBrowsers: Bool { value(Key.callsIncludeBrowsers, default: Default.callsIncludeBrowsers) }
     /// A short "Ended" toast when a call ends.
     static var callsAnnounceEnd: Bool { value(Key.callsAnnounceEnd, default: true) }
     /// A red dot and the time while the screen is recorded or shared.
@@ -170,7 +190,7 @@ enum Preferences {
     static var recordingShowsMicrophone: Bool { value(Key.recordingShowsMicrophone, default: true) }
     /// How far the closed notch reaches below the physical one while it shows a live activity, in
     /// points: 0 is flush with the camera housing.
-    static var compactLip: CGFloat { CGFloat(value(Key.compactLip, default: Double(Metrics.Notch.compactBottomLip))) }
+    static var compactLip: CGFloat { CGFloat(value(Key.compactLip, default: Default.compactLip)) }
     static var forceIsland: Bool { value(Key.forceIsland, default: false) }
 
     /// Reads a stored value, falling back when nothing is stored or registered (tests and previews).

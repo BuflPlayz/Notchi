@@ -6,7 +6,7 @@ struct AgentsSettingsView: View {
 
     @AppStorage(Preferences.Key.agentAnnouncesDone) private var announcesDone = true
     @AppStorage(Preferences.Key.agentShowsStep) private var showsStep = false
-    @AppStorage(Preferences.Key.agentTintsGlass) private var tintsGlass = true
+    @AppStorage(Preferences.Key.agentTintsGlass) private var tintsGlass = Preferences.Default.agentTintsGlass
     @Environment(\.moduleRegistry) private var registry
 
     /// Off stops everything: no folders watched, and installed hooks drop their events.

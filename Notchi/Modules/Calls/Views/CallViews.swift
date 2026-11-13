@@ -202,7 +202,7 @@ struct CallsSettingsView: View {
     let module: CallsModule
 
     @AppStorage(Preferences.Key.callsShowIncoming) private var showIncoming = true
-    @AppStorage(Preferences.Key.callsIncludeBrowsers) private var includeBrowsers = true
+    @AppStorage(Preferences.Key.callsIncludeBrowsers) private var includeBrowsers = Preferences.Default.callsIncludeBrowsers
     @AppStorage(Preferences.Key.callsAnnounceEnd) private var announceEnd = true
     @Environment(\.moduleRegistry) private var registry
 

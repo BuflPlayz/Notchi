@@ -16,20 +16,21 @@ final class AppEnvironment {
     }
 
     init() {
-        // Order breaks priority ties: a call takes the compact slots over a recording, a recording
-        // over a running Clock timer, and a timer over playing music.
+        // The default module order (Settings › Modules › Restore Defaults). It also breaks priority
+        // ties: a call takes the compact slots over playing music, music over a running Clock
+        // timer, and a timer over a recording.
+        // System toasts are transient (highest priority) whatever the order.
+        registry.register(SystemModule())
         registry.register(CallsModule())
-        registry.register(CaptureModule())
-        registry.register(ClockModule(provider: MobileTimerClockProvider()))
-        // Coding agents at work, one live activity per running session.
-        registry.register(AgentsModule())
         registry.register(MediaModule(provider: NowPlayingService(), audioMonitor: AudioLevelMonitor()))
+        registry.register(ClockModule(provider: MobileTimerClockProvider()))
         // Files dragged onto the notch.
         registry.register(ShelfModule())
         // An active Focus, quiet unless nothing else is running.
         registry.register(FocusModule())
-        // System toasts are transient (highest priority) whatever the order.
-        registry.register(SystemModule())
+        registry.register(CaptureModule())
+        // Coding agents at work, one live activity per running session.
+        registry.register(AgentsModule())
     }
 
     func start() {

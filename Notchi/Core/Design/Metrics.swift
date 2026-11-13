@@ -6,13 +6,15 @@ enum Metrics {
     /// Gap between the surface's sides and compact content pinned to the edges: about the space
     /// above and below a compact glyph, so the padding looks even all round.
     static let compactEdgeInset: CGFloat = 5
-    /// Default width of each compact slot (left and right of the notch): room for one glyph or artwork.
+    /// Reference width of each compact slot (left and right of the notch): room for one glyph or
+    /// artwork. The setting's default is `Preferences.Default.compactSideWidth`.
     static let compactSideWidth: CGFloat = 36
     /// Range of the "Live activity width" setting.
     static let compactSideWidthRange: ClosedRange<CGFloat> = 24...80
     /// Widest slot a module may ask for (for example, a timer readout). Sizes the fixed panel.
     static let maxCompactSideWidth: CGFloat = 120
-    /// Default width of the expanded panel. It grows if the notch plus compact slots would be wider.
+    /// Reference width of the expanded panel (the setting's default is `Preferences.Default.expandedWidth`).
+    /// It grows if the notch plus compact slots would be wider.
     static let expandedWidth: CGFloat = 460
     /// Range of the "Panel width" setting.
     static let expandedWidthRange: ClosedRange<CGFloat> = 380...600
@@ -47,7 +49,8 @@ enum Metrics {
 
         /// Bottom corner radius of the physical notch, roughly.
         static let hardwareBottomRadius: CGFloat = 8
-        /// Default for how far the hardware notch's black feathers out into the glass.
+        /// Reference for how far the hardware notch's black feathers out into the glass (the
+        /// setting's default is `Preferences.Default.notchBlend`).
         static let hardwareBlend: CGFloat = 16
         /// Range of the "Notch blend" setting.
         static let hardwareBlendRange: ClosedRange<CGFloat> = 0...60

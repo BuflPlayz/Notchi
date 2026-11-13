@@ -11,11 +11,11 @@ extension Notification.Name {
 /// transition (idle ↔ compact ↔ expanded) is a single continuous, interruptible spring.
 struct NotchContainerView: View {
     let model: NotchViewModel
-    @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = true
-    @AppStorage(Preferences.Key.glassClarity) private var glassClarity = 85.0
+    @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = Preferences.Default.islandVisibleWhenIdle
+    @AppStorage(Preferences.Key.glassClarity) private var glassClarity = Preferences.Default.glassClarity
     @AppStorage(Preferences.Key.glassStyle) private var glassStyle = GlassStyle.clear
-    @AppStorage(Preferences.Key.notchBlend) private var notchBlend = Double(Metrics.Notch.hardwareBlend)
-    @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = 60.0
+    @AppStorage(Preferences.Key.notchBlend) private var notchBlend = Preferences.Default.notchBlend
+    @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = Preferences.Default.edgeHighlight
 
     @Namespace private var namespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

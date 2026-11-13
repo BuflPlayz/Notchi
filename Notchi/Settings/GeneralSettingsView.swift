@@ -5,25 +5,25 @@ struct GeneralSettingsView: View {
     let registry: ModuleRegistry
 
     @AppStorage(Preferences.Key.openOnHover) private var openOnHover = true
-    @AppStorage(Preferences.Key.expandDelay) private var expandDelay = 0.15
-    @AppStorage(Preferences.Key.collapseDelay) private var collapseDelay = 0.3
+    @AppStorage(Preferences.Key.expandDelay) private var expandDelay = Preferences.Default.expandDelay
+    @AppStorage(Preferences.Key.collapseDelay) private var collapseDelay = Preferences.Default.collapseDelay
     @AppStorage(Preferences.Key.hapticsEnabled) private var hapticsEnabled = true
-    @AppStorage(Preferences.Key.compactSideWidth) private var compactSideWidth = Double(Metrics.compactSideWidth)
-    @AppStorage(Preferences.Key.expandedWidth) private var expandedWidth = Double(Metrics.expandedWidth)
-    @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = true
+    @AppStorage(Preferences.Key.compactSideWidth) private var compactSideWidth = Preferences.Default.compactSideWidth
+    @AppStorage(Preferences.Key.expandedWidth) private var expandedWidth = Preferences.Default.expandedWidth
+    @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = Preferences.Default.islandVisibleWhenIdle
     @AppStorage(Preferences.Key.hideInFullScreen) private var hideInFullScreen = true
     @AppStorage(Preferences.Key.menuBarSafeZone) private var menuBarSafeZone = true
-    @AppStorage(Preferences.Key.glassClarity) private var glassClarity = 85.0
+    @AppStorage(Preferences.Key.glassClarity) private var glassClarity = Preferences.Default.glassClarity
     @AppStorage(Preferences.Key.glassStyle) private var glassStyle = GlassStyle.clear
-    @AppStorage(Preferences.Key.notchBlend) private var notchBlend = Double(Metrics.Notch.hardwareBlend)
-    @AppStorage(Preferences.Key.notchCornerRadius) private var cornerRadius = Double(Metrics.Notch.expandedBottomRadius)
-    @AppStorage(Preferences.Key.notchTopCurve) private var topCurve = Double(Metrics.Notch.expandedTopRadius)
+    @AppStorage(Preferences.Key.notchBlend) private var notchBlend = Preferences.Default.notchBlend
+    @AppStorage(Preferences.Key.notchCornerRadius) private var cornerRadius = Preferences.Default.notchCornerRadius
+    @AppStorage(Preferences.Key.notchTopCurve) private var topCurve = Preferences.Default.notchTopCurve
     @AppStorage(Preferences.Key.compactAlignment) private var compactAlignment = CompactAlignment.center
-    @AppStorage(Preferences.Key.compactLip) private var compactLip = Double(Metrics.Notch.compactBottomLip)
+    @AppStorage(Preferences.Key.compactLip) private var compactLip = Preferences.Default.compactLip
     @AppStorage(Preferences.Key.openAnimation) private var openAnimation = OpenAnimation.snappy
-    @AppStorage(Preferences.Key.openDuration) private var openDuration = 0.35
-    @AppStorage(Preferences.Key.openBounce) private var openBounce = 22.0
-    @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = 60.0
+    @AppStorage(Preferences.Key.openDuration) private var openDuration = Preferences.Default.openDuration
+    @AppStorage(Preferences.Key.openBounce) private var openBounce = Preferences.Default.openBounce
+    @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = Preferences.Default.edgeHighlight
 
     @State private var launchAtLogin = LaunchAtLogin.shared
     @State private var isConfirmingReset = false
