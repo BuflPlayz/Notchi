@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Preferences.registerDefaults()
         environment.start()
+        StartupPermissions.requestMissing(registry: environment.registry)
         handleTerminationSignal()
     }
 
