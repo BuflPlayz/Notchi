@@ -9,7 +9,19 @@ struct AboutSettingsView: View {
         return "Version \(short) (\(build))"
     }
 
+    // In a scroll view like every other pane: a pane without one blanks the Settings sidebar's rows.
     var body: some View {
+        ScrollView {
+            content
+                // Capped, or the acknowledgement asks for one long line.
+                .frame(maxWidth: 380)
+                .padding(28)
+                .frame(maxWidth: .infinity)
+        }
+        .defaultScrollAnchor(.center)
+    }
+
+    private var content: some View {
         VStack(spacing: 14) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
@@ -39,8 +51,6 @@ struct AboutSettingsView: View {
             Button("Quit Notchi") { NSApp.terminate(nil) }
                 .padding(.top, 4)
         }
-        .padding(28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

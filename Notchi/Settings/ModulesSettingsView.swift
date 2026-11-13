@@ -4,27 +4,50 @@ import SwiftUI
 struct ModulesSettingsView: View {
     let registry: ModuleRegistry
 
+    /// The module being dragged, so the rows it passes over can make room for it.
+    @State private var draggingID: String?
+
+    // A grouped form like every other pane. A pane without a scroll view at its root blanks the
+    // whole Settings window, sidebar included.
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            List {
+        SettingsPane {
+            Section {
+                // Explicit drag and drop rather than `onMove`, which never starts a drag in a
+                // macOS form or list. Rows make room as the dragged one passes over them.
                 ForEach(registry.orderedModules, id: \.id) { module in
                     row(for: module)
+                        .contentShape(Rectangle())
+                        .opacity(draggingID == module.id ? 0.4 : 1)
+                        .onDrag {
+                            draggingID = module.id
+                            endDragOnMouseUp()
+                            return NSItemProvider(object: module.id as NSString)
+                        }
+                        .onDrop(of: [.text], delegate: ModuleDropDelegate(
+                            targetID: module.id, draggingID: $draggingID, registry: registry
+                        ))
                 }
-                .onMove(perform: registry.move)
+            } footer: {
+                SettingsFootnote("Drag to reorder. The order sets the tabs in the opened notch, and which module takes the closed notch when two have something to show at once (toasts and HUDs always come first). A module that's off stops completely.")
             }
-            .listStyle(.inset(alternatesRowBackgrounds: false))
-            .frame(height: CGFloat(registry.allModules.count) * 40 + 12)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-            SettingsFootnote("Drag to reorder. The order sets the tabs in the opened notch, and which module takes the closed notch when two have something to show at once (toasts and HUDs always come first). A module that's off stops completely.")
-
-            HStack {
-                Spacer()
-                Button("Restore Defaults", action: registry.resetModules)
+            Section {
+                HStack {
+                    Spacer()
+                    Button("Restore Defaults", action: registry.resetModules)
+                }
             }
         }
-        .padding(20)
-        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    /// A drag dropped outside the rows reports nothing, so watch the button instead.
+    private func endDragOnMouseUp() {
+        Task { @MainActor in
+            while NSEvent.pressedMouseButtons & 1 != 0 {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            draggingID = nil
+        }
     }
 
     private func row(for module: any NotchModule) -> some View {
@@ -51,7 +74,35 @@ struct ModulesSettingsView: View {
             .disabled(isLastEnabled)
             .help(isLastEnabled ? "At least one module stays on." : "")
         }
-        .padding(.vertical, 4)
+    }
+}
+
+/// Moves the dragged module into a row's place as soon as the drag enters it.
+private struct ModuleDropDelegate: DropDelegate {
+    let targetID: String
+    @Binding var draggingID: String?
+    let registry: ModuleRegistry
+
+    func validateDrop(info: DropInfo) -> Bool {
+        draggingID != nil
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingID, draggingID != targetID else { return }
+        let ids = registry.orderedModules.map(\.id)
+        guard let from = ids.firstIndex(of: draggingID), let to = ids.firstIndex(of: targetID) else { return }
+        withAnimation(.snappy) {
+            registry.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingID = nil
+        return true
     }
 }
 

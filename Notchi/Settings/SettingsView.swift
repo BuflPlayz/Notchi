@@ -1,7 +1,11 @@
 import SwiftUI
 
 /// The Settings window: General, Modules, one pane per module (from `NotchModule.settingsView()`),
-/// and About. Every control writes straight to UserDefaults, and the notch applies it live.
+/// and About, listed in a sidebar like System Settings. Every control writes straight to
+/// UserDefaults, and the notch applies it live.
+///
+/// A sidebar rather than toolbar tabs: with every module's pane there were more tabs than fit, and
+/// the ones AppKit moves into the toolbar's overflow menu can't be opened from there.
 struct SettingsView: View {
     let registry: ModuleRegistry
 
@@ -10,37 +14,119 @@ struct SettingsView: View {
     static let selectedTabKey = "settingsSelectedTab"
 
     var body: some View {
-        TabView(selection: $selection) {
-            GeneralSettingsView(registry: registry)
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag("general")
-
-            ModulesSettingsView(registry: registry)
-                .tabItem { Label("Modules", systemImage: "square.grid.2x2") }
-                .tag("modules")
-
-            ForEach(registry.orderedModules, id: \.id) { module in
-                if let pane = module.settingsView() {
-                    SettingsPane { pane }
-                        .environment(\.moduleRegistry, registry)
-                        .tabItem { Label(module.title, systemImage: module.symbol) }
-                        .tag(module.id)
+        let panes = SettingsPaneID.all(in: registry)
+        // A remembered pane that's gone (its module removed) falls back to General.
+        let current = panes.first { $0.id == selection } ?? panes[0]
+        NavigationSplitView {
+            List(selection: Binding<String?>(
+                get: { current.id },
+                set: { if let id = $0 { selection = id } }
+            )) {
+                Section {
+                    ForEach(panes.filter { $0.group == .app }) { SettingsSidebarRow(pane: $0) }
+                }
+                Section {
+                    ForEach(panes.filter { $0.group == .module }) { SettingsSidebarRow(pane: $0) }
+                }
+                Section {
+                    ForEach(panes.filter { $0.group == .about }) { SettingsSidebarRow(pane: $0) }
                 }
             }
-
-            AboutSettingsView()
-                .tabItem { Label("About", systemImage: "info.circle") }
-                .tag("about")
+            // The Settings window ignores the column width on its own, so the list holds it open too.
+            .frame(minWidth: 200)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            detail(for: current)
+                .navigationTitle(current.title)
         }
-        .frame(width: SettingsWindowSize.width)
+        .frame(minWidth: SettingsWindowSize.minimumWidth, minHeight: 360)
         .background(SettingsWindowSize())
+    }
+
+    @ViewBuilder
+    private func detail(for pane: SettingsPaneID) -> some View {
+        switch pane.id {
+        case "general": GeneralSettingsView(registry: registry)
+        case "modules": ModulesSettingsView(registry: registry)
+        case "about": AboutSettingsView()
+        default:
+            if let view = registry.orderedModules.first(where: { $0.id == pane.id })?.settingsView() {
+                SettingsPane { view }
+                    .environment(\.moduleRegistry, registry)
+                    // A fresh form per module, so one pane's scroll position doesn't carry over.
+                    .id(pane.id)
+            }
+        }
     }
 }
 
-/// Keeps the resizable Settings window at the panes' width, and opens it at a height that fits
-/// on screen (SwiftUI would otherwise pick its own default size).
+/// One entry in the Settings sidebar.
+private struct SettingsPaneID: Identifiable {
+    enum Group { case app, module, about }
+
+    let id: String
+    let title: String
+    let symbol: String
+    let tint: Color
+    let group: Group
+
+    @MainActor
+    static func all(in registry: ModuleRegistry) -> [SettingsPaneID] {
+        // The saved order isn't observable, but every reorder rebuilds `modules`, so reading it
+        // keeps the sidebar in the order set in the Modules pane.
+        _ = registry.modules
+        let modules = registry.orderedModules.compactMap { module -> SettingsPaneID? in
+            guard module.settingsView() != nil else { return nil }
+            return SettingsPaneID(
+                id: module.id, title: module.title, symbol: module.symbol,
+                tint: tints[module.id] ?? .gray, group: .module
+            )
+        }
+        return [
+            SettingsPaneID(id: "general", title: "General", symbol: "gearshape.fill", tint: .gray, group: .app),
+            SettingsPaneID(id: "modules", title: "Modules", symbol: "square.grid.2x2.fill", tint: .blue, group: .app),
+        ] + modules + [
+            SettingsPaneID(id: "about", title: "About", symbol: "info.circle.fill", tint: .gray, group: .about),
+        ]
+    }
+
+    /// Icon colors, System Settings style. Modules not listed are grey.
+    private static let tints: [String: Color] = [
+        "media": .pink,
+        "clock": .orange,
+        "system": .blue,
+        "focus": .indigo,
+        "calls": .green,
+        "recording": .red,
+        "agents": .purple,
+        "shelf": .teal,
+    ]
+}
+
+/// A sidebar row: the pane's symbol in a colored rounded square, then its name.
+private struct SettingsSidebarRow: View {
+    let pane: SettingsPaneID
+
+    var body: some View {
+        Label {
+            Text(pane.title)
+        } icon: {
+            Image(systemName: pane.symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(pane.tint.gradient, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .tag(pane.id)
+    }
+}
+
+/// Opens the Settings window at a size that fits the sidebar and a pane, and on screen (SwiftUI
+/// would otherwise pick its own default size). It stays resizable from there.
 private struct SettingsWindowSize: NSViewRepresentable {
-    static let width: CGFloat = 500
+    static let minimumWidth: CGFloat = 680
+    static let width: CGFloat = 740
 
     func makeNSView(context: Context) -> NSView { WindowHook() }
     func updateNSView(_ nsView: NSView, context: Context) {}
@@ -49,10 +135,9 @@ private struct SettingsWindowSize: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             guard let window else { return }
-            window.contentMaxSize = NSSize(width: SettingsWindowSize.width, height: .greatestFiniteMagnitude)
-            // Room for the title bar, tabs and Dock.
+            // Room for the title bar and Dock.
             let available = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
-            window.setContentSize(NSSize(width: SettingsWindowSize.width, height: min(640, available - 160)))
+            window.setContentSize(NSSize(width: SettingsWindowSize.width, height: min(640, available - 120)))
         }
     }
 }
