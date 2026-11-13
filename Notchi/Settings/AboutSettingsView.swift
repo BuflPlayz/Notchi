@@ -1,7 +1,10 @@
 import SwiftUI
 
-/// Version, acknowledgements, and a way to quit (Notchi has no Dock icon or menu bar item).
+/// Version, updates, acknowledgements, and a way to quit (Notchi has no Dock icon or menu bar item).
 struct AboutSettingsView: View {
+    @AppStorage(Preferences.Key.checkForUpdates) private var checkForUpdates = true
+    @State private var updates = UpdateChecker.shared
+
     private var version: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "?"
@@ -36,6 +39,8 @@ struct AboutSettingsView: View {
                     .foregroundStyle(.tertiary)
             }
 
+            updatesSection
+
             Divider().padding(.horizontal, 40)
 
             VStack(spacing: 4) {
@@ -50,6 +55,39 @@ struct AboutSettingsView: View {
 
             Button("Quit Notchi") { NSApp.terminate(nil) }
                 .padding(.top, 4)
+        }
+    }
+}
+
+extension AboutSettingsView {
+    private var updatesSection: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Button("Check for Updates…") {
+                    Task { await updates.check(userInitiated: true) }
+                }
+                .disabled(updates.status == .checking)
+                if case .available(let release) = updates.status {
+                    Button("Download \(release.version)") { updates.download(release) }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+            Toggle("Check for updates automatically", isOn: $checkForUpdates)
+                .toggleStyle(.checkbox)
+            Text(updateStatus)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private var updateStatus: String {
+        switch updates.status {
+        case .checking: return "Checking…"
+        case .available(let release): return "Notchi \(release.version) is available."
+        case .failed: return "Couldn't reach GitHub."
+        case .idle, .upToDate:
+            guard let lastChecked = updates.lastChecked else { return "Not checked yet." }
+            return "Last checked \(lastChecked.formatted(.relative(presentation: .named)))."
         }
     }
 }
