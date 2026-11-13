@@ -19,6 +19,7 @@ enum Preferences {
         static let islandVisibleWhenIdle = "islandVisibleWhenIdle"
         static let clockShowsPaused = "clockShowsPaused"
         static let hideInFullScreen = "hideInFullScreen"
+        static let menuBarSafeZone = "menuBarSafeZone"
         static let glassClarity = "glassClarity"
         static let edgeHighlight = "edgeHighlight"
         static let glassStyle = "glassStyle"
@@ -46,7 +47,7 @@ enum Preferences {
     static let allKeys = [
         Key.expandDelay, Key.collapseDelay, Key.hapticsEnabled, Key.compactSideWidth, Key.expandedWidth,
         Key.showAllMediaSources, Key.realAudioVisualizer, Key.replaceSystemHUD, Key.batteryAlerts,
-        Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen,
+        Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen, Key.menuBarSafeZone,
         Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
         Key.compactAlignment, Key.compactLip, Key.openAnimation, Key.openDuration, Key.openBounce,
         Key.agentAnnouncesDone, Key.agentShowsStep, Key.agentTintsGlass,
@@ -70,6 +71,7 @@ enum Preferences {
             Key.islandVisibleWhenIdle: true,
             Key.clockShowsPaused: true,
             Key.hideInFullScreen: true,
+            Key.menuBarSafeZone: true,
             Key.glassClarity: 85.0,
             Key.edgeHighlight: 60.0,
             Key.glassStyle: GlassStyle.clear.rawValue,
@@ -116,6 +118,8 @@ enum Preferences {
     static var islandVisibleWhenIdle: Bool { value(Key.islandVisibleWhenIdle, default: true) }
     /// Hide the notch while a full-screen app is in front (the volume and brightness HUD still shows).
     static var hideInFullScreen: Bool { value(Key.hideInFullScreen, default: true) }
+    /// The live activity tucks back into the notch while the pointer is on the menu bar icons it covers.
+    static var menuBarSafeZone: Bool { value(Key.menuBarSafeZone, default: true) }
     /// Show paused Clock timers and a paused stopwatch in compact mode, not just running ones.
     static var clockShowsPaused: Bool { value(Key.clockShowsPaused, default: true) }
     /// Announce in the notch when a Focus turns on or off (needs Accessibility).

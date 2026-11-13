@@ -10,6 +10,8 @@ protocol NotchViewModelDelegate: AnyObject {
     func notchGeometryDidChange()
     /// Full-screen hiding turned on or off; hover and clicks follow.
     func notchSuppressionDidChange()
+    /// `menuBarSafeZones` changed without a transition.
+    func notchSafeZonesDidChange()
 }
 
 /// The notch's state machine. Inputs are hover/click intent and the modules' live activities;
@@ -28,6 +30,13 @@ final class NotchViewModel {
     private(set) var isSuppressed = false
     /// True while the user drags something (from another app) that the notch could take.
     private(set) var isDragging = false
+    /// True while the pointer is on menu bar icons that the compact notch covers: the live activity
+    /// tucks back into the notch so they show and take clicks.
+    private(set) var isSteppingAside = false
+    /// The menu bar the compact notch and its bubbles cover beside the physical notch, in global
+    /// coordinates. Kept while stepping aside, so the pointer can stay there. Empty unless an
+    /// activity is (or would be) showing compact.
+    @ObservationIgnored private(set) var menuBarSafeZones: [CGRect] = []
     /// Other live activities, as bubbles either side of the compact notch.
     private(set) var satellites = SatelliteSlots()
     /// The module compact mode shows. Committed here with each transition rather than read live
@@ -169,6 +178,13 @@ final class NotchViewModel {
         reevaluate()
     }
 
+    /// The pointer moved onto (or off) the menu bar icons the compact notch covers.
+    func setSteppingAside(_ steppingAside: Bool) {
+        guard steppingAside != isSteppingAside else { return }
+        isSteppingAside = steppingAside
+        reevaluate()
+    }
+
     /// Click on the notch: open without waiting for the hover delay.
     func expandNow() {
         guard !isSuppressed else { return }
@@ -229,6 +245,9 @@ final class NotchViewModel {
         guard newGeometry != geometry else { return }
         geometry = newGeometry
         layout = targetLayout(for: state)
+        if !menuBarSafeZones.isEmpty {
+            menuBarSafeZones = targetLayout(for: .compact).menuBarSafeZones(satellites: satellites.occupied, in: geometry)
+        }
         delegate?.notchGeometryDidChange()
     }
 
@@ -251,6 +270,9 @@ final class NotchViewModel {
         let visibleActivity = isSuppressed ? activity.flatMap { $0.showsInFullScreen ? $0 : nil } : activity
         var target = NotchState.resolve(expandRequested: expandRequested && !isSuppressed, hasLiveActivity: visibleActivity != nil)
         if let sizePreview, sizePreview.rank > target.rank, !isSuppressed { target = sizePreview }
+        let showsCompact = target == .compact && !isSuppressed
+        // On the menu bar icons it covers, the activity waits inside the notch (a size preview doesn't).
+        if showsCompact && isSteppingAside && sizePreview == nil { target = .idle }
 
         // While closed for a reopen, wait for it, unless the user opens the panel.
         if reopenTask != nil {
@@ -268,7 +290,15 @@ final class NotchViewModel {
         let newCompactID = target == .compact ? foreground?.id : nil
         // Mid-swap the slots are the swap's to manage; it re-evaluates when it's done.
         let newSatellites = swapTask == nil ? satellites.reconciled(with: registry.satelliteCandidates.map(\.id)) : satellites
-        guard target != state || newLayout != layout || newSatellites != satellites || newCompactID != compactModuleID else { return }
+        let zones = showsCompact && Preferences.menuBarSafeZone
+            ? targetLayout(for: .compact).menuBarSafeZones(satellites: newSatellites.occupied, in: geometry)
+            : []
+        let zonesChanged = zones != menuBarSafeZones
+        menuBarSafeZones = zones
+        guard target != state || newLayout != layout || newSatellites != satellites || newCompactID != compactModuleID else {
+            if zonesChanged { delegate?.notchSafeZonesDidChange() }
+            return
+        }
         transition(to: target, layout: newLayout, satellites: newSatellites)
     }
 

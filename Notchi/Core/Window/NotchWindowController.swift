@@ -31,6 +31,9 @@ final class NotchWindowController: NotchViewModelDelegate {
         hover.onHoverChange = { [weak model] isInside in
             model?.hoverChanged(isInside: isInside)
         }
+        hover.onSafeZoneChange = { [weak model] isInSafeZone in
+            model?.setSteppingAside(isInSafeZone)
+        }
         model.delegate = self
         dragDetector.onChange = { [weak self] isDragging in
             self?.hover.isDragging = isDragging
@@ -60,8 +63,13 @@ final class NotchWindowController: NotchViewModelDelegate {
         if model.isSuppressed { removeClickAwayMonitor() }
     }
 
+    func notchSafeZonesDidChange() {
+        updateHitRects(layout: model.layout, satellites: model.visibleSatellites.map(\.side))
+    }
+
     /// Nothing is interactive while hidden for a full-screen app: the top edge belongs to its menu bar.
-    /// The bubbles take clicks but don't open the notch on hover.
+    /// The bubbles take clicks but don't open the notch on hover. On the menu bar beside the notch,
+    /// clicks go to the menu bar icons instead (the notch steps aside to uncover them).
     private func updateHitRects(layout: NotchLayout, satellites: [SatelliteSide]) {
         guard !model.isSuppressed else {
             hover.setHitRect(.zero)
@@ -69,7 +77,8 @@ final class NotchWindowController: NotchViewModelDelegate {
         }
         hover.setHitRect(
             layout.hitRect(in: model.geometry),
-            clickable: satellites.map { layout.satelliteHitRect($0, in: model.geometry) }
+            clickable: satellites.map { layout.satelliteHitRect($0, in: model.geometry) },
+            safeZones: model.menuBarSafeZones
         )
     }
 

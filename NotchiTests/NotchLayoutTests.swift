@@ -168,4 +168,41 @@ struct CompactHeightTests {
         let expected: [CGFloat] = [0, 26 / 300, 50 / 300, 250 / 300, 274 / 300, 1]
         #expect(stops.map(\.location) == expected)
     }
+
+}
+
+struct MenuBarSafeZoneTests {
+    @Test(arguments: [NotchGeometry.previewNotch, NotchGeometry.previewIsland])
+    func safeZonesCoverTheMenuBarBesideTheNotch(geometry: NotchGeometry) {
+        let compact = NotchLayout.make(state: .compact, geometry: geometry)
+        let zones = compact.menuBarSafeZones(satellites: [], in: geometry)
+        let core = geometry.idleSize.width / 2
+        let top = geometry.screenFrame.maxY
+
+        #expect(zones.count == 2)
+        for zone in zones {
+            // Never over the physical notch (or resting island), which still opens the notch.
+            #expect(zone.maxX <= geometry.centerX - core || zone.minX >= geometry.centerX + core)
+            #expect(zone.minY == top - geometry.menuBarHeight)
+            #expect(zone.maxY > top)
+        }
+        #expect(zones.map(\.minX).min() == geometry.centerX - compact.size.width / 2)
+        #expect(zones.map(\.maxX).max() == geometry.centerX + compact.size.width / 2)
+    }
+
+    @Test func safeZoneReachesOverABubble() {
+        let geometry = NotchGeometry.previewNotch
+        let compact = NotchLayout.make(state: .compact, geometry: geometry)
+        let zones = compact.menuBarSafeZones(satellites: [.trailing], in: geometry)
+        let bubble = compact.satelliteHitRect(.trailing, in: geometry)
+
+        #expect(zones.contains { $0.contains(CGPoint(x: bubble.midX, y: bubble.midY)) })
+        #expect(zones.map(\.minX).min() == geometry.centerX - compact.size.width / 2)
+    }
+
+    @Test func idleCoversNoMenuBar() {
+        let geometry = NotchGeometry.previewNotch
+        let idle = NotchLayout.make(state: .idle, geometry: geometry)
+        #expect(idle.menuBarSafeZones(satellites: [], in: geometry).isEmpty)
+    }
 }

@@ -12,6 +12,7 @@ struct GeneralSettingsView: View {
     @AppStorage(Preferences.Key.expandedWidth) private var expandedWidth = Double(Metrics.expandedWidth)
     @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = true
     @AppStorage(Preferences.Key.hideInFullScreen) private var hideInFullScreen = true
+    @AppStorage(Preferences.Key.menuBarSafeZone) private var menuBarSafeZone = true
     @AppStorage(Preferences.Key.glassClarity) private var glassClarity = 85.0
     @AppStorage(Preferences.Key.glassStyle) private var glassStyle = GlassStyle.clear
     @AppStorage(Preferences.Key.notchBlend) private var notchBlend = Double(Metrics.Notch.hardwareBlend)
@@ -58,10 +59,11 @@ struct GeneralSettingsView: View {
                 }
                 Toggle("Haptic feedback when opening", isOn: $hapticsEnabled)
                 Toggle("Hide in full screen", isOn: $hideInFullScreen)
+                Toggle("Make room for menu bar icons", isOn: $menuBarSafeZone)
             } header: {
                 Text("Opening")
             } footer: {
-                SettingsFootnote("Open animation sets how the notch springs out: Smooth stops without overshooting, Bouncy and Elastic overshoot and settle back. Picking one replays it on the notch. With Reduce Motion on, the notch always fades open. With hover off, click the notch to open it. Moving away or clicking elsewhere closes it either way. In full screen, the notch stays hidden and the top edge is left to the app's menu bar; only the volume and brightness HUD still appears.")
+                SettingsFootnote("Open animation sets how the notch springs out: Smooth stops without overshooting, Bouncy and Elastic overshoot and settle back. Picking one replays it on the notch. With Reduce Motion on, the notch always fades open. With hover off, click the notch to open it. Moving away or clicking elsewhere closes it either way. In full screen, the notch stays hidden and the top edge is left to the app's menu bar; only the volume and brightness HUD still appears. With Make room for menu bar icons on, a live activity tucks back into the notch while the pointer is on the menu bar beside it, so the icons it covers show and take clicks; open the notch from its middle instead.")
             }
 
             Section {
