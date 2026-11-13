@@ -11,9 +11,17 @@
 # "Publish a release" there to only build a DMG you can download from the run's
 # artifacts.
 #
-# Signing: with no secrets, the DMG is signed ad hoc and people have to click
-# "Open Anyway" in System Settings › Privacy & Security on first launch. To sign
-# with Developer ID and notarize, add these repository secrets:
+# Signing, best first:
+# - Developer ID (and notarized): no warning on first launch. Needs the secrets
+#   below.
+# - Notchi's self-signed release certificate, from NOTCHI_SIGNING_P12 (.p12,
+#   base64) and NOTCHI_SIGNING_P12_PASSWORD. People click "Open Anyway" in
+#   System Settings › Privacy & Security on first launch, but every release is
+#   the same app to macOS: permissions carry over and the in-app updater can
+#   verify updates. Keep this certificate: releases signed with another one
+#   lose both.
+# - Neither: ad hoc, which loses permissions on every update.
+# For Developer ID, add these repository secrets:
 #   DEVELOPER_ID_P12           Developer ID Application certificate + key, .p12, base64
 #   DEVELOPER_ID_P12_PASSWORD  The .p12's password
 #   NOTARY_KEY_P8              App Store Connect API key (.p8), base64
@@ -88,9 +96,35 @@ jobs:
           NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          SELF_P12: ${{ secrets.NOTCHI_SIGNING_P12 }}
+          SELF_P12_PASSWORD: ${{ secrets.NOTCHI_SIGNING_P12_PASSWORD }}
         run: |
+          if [[ -z "$P12" && -n "$SELF_P12" ]]; then
+            # Notchi's self-signed release certificate, in a throwaway keychain.
+            keychain="$RUNNER_TEMP/signing.keychain-db"
+            keychain_password="$(uuidgen)"
+            security create-keychain -p "$keychain_password" "$keychain"
+            security set-keychain-settings -lut 21600 "$keychain"
+            security unlock-keychain -p "$keychain_password" "$keychain"
+            echo "$SELF_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$SELF_P12_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+            rm -f "$RUNNER_TEMP/cert.p12"
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+            security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+            # Self-signed, so not "valid" (-v) to macOS; codesign uses it all the same.
+            identity="$(security find-identity -p codesigning "$keychain" | sed -n 's/.*"\(.*\)".*/\1/p' | head -1)"
+            [[ -n "$identity" ]] || { echo "::error::No signing identity in NOTCHI_SIGNING_P12"; exit 1; }
+            echo "Signing with the self-signed certificate $identity"
+            {
+              echo "mode=self-signed"
+              echo "identity=$identity"
+              echo "notarized=false"
+              echo "keychain=$keychain"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [[ -z "$P12" ]]; then
-            echo "No Developer ID certificate in secrets; signing ad hoc."
+            echo "::warning::No signing certificate in secrets; signing ad hoc. Permissions won't carry over between updates."
             echo "mode=adhoc" >> "$GITHUB_OUTPUT"
             echo "notarized=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -146,6 +180,8 @@ jobs:
             if [[ "$NOTARIZE" == "true" ]]; then
               args+=(--notarize notchi-notary --keychain "$KEYCHAIN")
             fi
+          elif [[ "$MODE" == "self-signed" ]]; then
+            args+=(--self-signed "$IDENTITY")
           else
             args+=(--adhoc)
           fi

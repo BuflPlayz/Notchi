@@ -80,7 +80,7 @@ final class AppEnvironment {
     /// `call:end` (fake calls), `rec:screen` / `rec:audio` / `rec:off` (fake recordings), `callDump` (Notification
     /// Center's windows, to see how a call's alert is built, written to `$TMPDIR`), `focusDump` / `focusTrace` (what the Focus
     /// monitor sees, written to `$TMPDIR`),
-    /// `settings:<tab>` (general, modules, clock, media, system, about), `closeSettings`, `hud:volume:0.6` / `hud:brightness:0.3` / `hud:mute`, `audioTap` (runs the visualizer's audio tap for 6 s and logs
+    /// `settings:<tab>` (general, modules, clock, media, system, about), `closeSettings`, `installUpdate:<version>:<dmg path>` (installs a local DMG through the updater), `hud:volume:0.6` / `hud:brightness:0.3` / `hud:mute`, `audioTap` (runs the visualizer's audio tap for 6 s and logs
     /// the result under subsystem `dev.notchi.Notchi`, category `AudioTap`).
     private func installDebugCommands() {
         DistributedNotificationCenter.default().addObserver(
@@ -118,6 +118,13 @@ final class AppEnvironment {
                     (self?.registry.module(withID: "agents") as? AgentsModule)?.showDebugAgent(String(command.dropFirst("agent:".count)))
                 case let command? where command.hasPrefix("swap:"):
                     model.bringToFront(String(command.dropFirst("swap:".count)))
+                case let command? where command.hasPrefix("installUpdate:"):
+                    // installUpdate:<version>:<path to a DMG>: install it like a release from GitHub.
+                    let parts = command.dropFirst("installUpdate:".count).split(separator: ":", maxSplits: 1).map(String.init)
+                    if parts.count == 2, let version = AppVersion(parts[0]) {
+                        let dmg = URL(fileURLWithPath: parts[1])
+                        UpdateChecker.shared.install(.init(version: version, pageURL: dmg, downloadURL: dmg))
+                    }
                 case "closeSettings":
                     NSApp.windows.filter { !($0 is NotchPanel) && $0.isVisible }.forEach { $0.close() }
                 case let command? where command.hasPrefix("show:"):

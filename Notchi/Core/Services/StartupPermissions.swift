@@ -11,13 +11,51 @@ import OSLog
 /// Only what's missing is asked for, one prompt at a time. macOS asks about each permission once:
 /// after a "Don't Allow" its prompt stays away, and the Accessibility prompt points to System
 /// Settings until the switch is turned on there.
+///
+/// macOS ties a permission to the app's signing identity. When that changes (moving from ad-hoc
+/// builds to signed ones, or between a local build and a release), the old entry stays in System
+/// Settings, switched on but ignored, and it blocks a new one, so people had to remove it by hand.
+/// So the first launch under a new identity clears Notchi's own entries that aren't working before
+/// asking. Working ones are left alone.
 @MainActor
 enum StartupPermissions {
     private static let logger = Logger(subsystem: "dev.notchi.Notchi", category: "Permissions")
 
     static func requestMissing(registry: ModuleRegistry) {
+        clearStaleEntriesIfIdentityChanged()
         requestAudioCaptureIfNeeded(registry: registry) {
             requestAccessibilityIfNeeded(registry: registry)
+        }
+    }
+
+    // MARK: Stale entries
+
+    private static func clearStaleEntriesIfIdentityChanged() {
+        guard let identity = UpdateInstaller.ownRequirementString, let bundleID = Bundle.main.bundleIdentifier else { return }
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: Preferences.Key.permissionIdentity) != identity else { return }
+        if !AXIsProcessTrusted() {
+            resetPermission("Accessibility", for: bundleID)
+        }
+        if AudioCapturePermission.status == .denied {
+            resetPermission("AudioCapture", for: bundleID)
+        }
+        defaults.set(identity, forKey: Preferences.Key.permissionIdentity)
+    }
+
+    /// Clears Notchi's own entry for one permission, like `tccutil reset <service> <bundle id>`.
+    private static func resetPermission(_ service: String, for bundleID: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", service, bundleID]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            logger.notice("New signing identity: cleared the old \(service, privacy: .public) entry (\(process.terminationStatus))")
+        } catch {
+            logger.error("Couldn't clear the old \(service, privacy: .public) entry: \(error.localizedDescription, privacy: .public)")
         }
     }
 

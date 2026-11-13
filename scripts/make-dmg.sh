@@ -20,7 +20,13 @@
 #                         Needs a Developer ID identity.
 #   --keychain <path>     Keychain holding the notarytool profile, if it isn't in
 #                         the search list (CI uses a temporary one).
-#   --adhoc               Sign ad hoc instead (no Apple account needed). The DMG
+#   --self-signed "<name>"  Sign with a self-signed certificate (Notchi's release
+#                         certificate, "Notchi Release Signing"). Like --adhoc,
+#                         other Macs must allow the first install in System
+#                         Settings › Privacy & Security, but every build signed
+#                         with it is the same app to macOS, so permissions carry
+#                         over between updates and the updater can verify them.
+#   --adhoc               Sign ad hoc instead (no certificate needed). The DMG
 #                         works on this Mac; other Macs must allow it in
 #                         System Settings › Privacy & Security.
 #   -h, --help            Show this help.
@@ -38,6 +44,7 @@ TEAM=""
 NOTARY_PROFILE=""
 NOTARY_KEYCHAIN=""
 ADHOC=0
+SELF_SIGNED=""
 
 usage() { sed -n '2,/^$/s/^# \{0,1\}//p' "$0"; }
 die() { echo "error: $*" >&2; exit 1; }
@@ -50,14 +57,18 @@ while [[ $# -gt 0 ]]; do
         --notarize) NOTARY_PROFILE="${2:?--notarize needs a keychain profile}"; shift 2 ;;
         --keychain) NOTARY_KEYCHAIN="${2:?--keychain needs a path}"; shift 2 ;;
         --adhoc) ADHOC=1; shift ;;
+        --self-signed) SELF_SIGNED="${2:?--self-signed needs a certificate name}"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) die "unknown option: $1 (see --help)" ;;
     esac
 done
 
 [[ "$(uname)" == "Darwin" ]] || die "building a DMG needs macOS"
-if [[ $ADHOC -eq 1 && ( -n "$IDENTITY" || -n "$NOTARY_PROFILE" ) ]]; then
-    die "--adhoc can't be combined with --identity or --notarize"
+if [[ $ADHOC -eq 1 && ( -n "$IDENTITY" || -n "$NOTARY_PROFILE" || -n "$SELF_SIGNED" ) ]]; then
+    die "--adhoc can't be combined with --identity, --self-signed or --notarize"
+fi
+if [[ -n "$SELF_SIGNED" && ( -n "$IDENTITY" || -n "$NOTARY_PROFILE" ) ]]; then
+    die "--self-signed can't be combined with --identity or --notarize"
 fi
 if [[ -n "$NOTARY_PROFILE" && "$IDENTITY" != Developer\ ID\ Application* ]]; then
     die "--notarize needs --identity \"Developer ID Application: …\""
@@ -69,6 +80,9 @@ if [[ $ADHOC -eq 1 ]]; then
     # Ad hoc signatures have no team ID, so the hardened runtime's library
     # validation would refuse to load the embedded MediaRemoteAdapter framework.
     SIGN_ARGS+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= ENABLE_HARDENED_RUNTIME=NO)
+elif [[ -n "$SELF_SIGNED" ]]; then
+    # No team ID either, so the same reason to turn off the hardened runtime.
+    SIGN_ARGS+=(CODE_SIGN_IDENTITY="$SELF_SIGNED" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= ENABLE_HARDENED_RUNTIME=NO)
 elif [[ -n "$IDENTITY" ]]; then
     SIGN_ARGS+=(CODE_SIGN_IDENTITY="$IDENTITY" CODE_SIGN_STYLE=Manual)
     [[ -n "$TEAM" ]] && SIGN_ARGS+=(DEVELOPMENT_TEAM="$TEAM")

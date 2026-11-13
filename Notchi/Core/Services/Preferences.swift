@@ -24,6 +24,8 @@ enum Preferences {
         /// Not settings: when updates were last checked, and a version the user chose to skip.
         static let lastUpdateCheck = "lastUpdateCheck"
         static let skippedUpdateVersion = "skippedUpdateVersion"
+        /// Not a setting: the signing identity the permissions were last set up for.
+        static let permissionIdentity = "permissionIdentity"
         static let glassClarity = "glassClarity"
         static let edgeHighlight = "edgeHighlight"
         static let glassStyle = "glassStyle"

@@ -1,12 +1,13 @@
 import AppKit
 import OSLog
 
-/// Tells people when a newer Notchi is out.
+/// Keeps Notchi up to date.
 ///
-/// Asks GitHub for the latest published release a little after launch and then once a day, and
-/// offers to download it when it's newer than the running version. It doesn't install anything:
-/// "Download" fetches the DMG, and the new app replaces this one by dragging it onto Applications.
-/// Settings › About has the switch for automatic checks and a "Check for Updates" button.
+/// Asks GitHub for the latest published release a little after launch and then once a day. When
+/// it's newer than the running version, "Install and Relaunch" downloads it, checks it (see
+/// `UpdateInstaller`), swaps it in for this copy and reopens Notchi. When it can't install itself
+/// (an ad-hoc build, or a folder it can't write to), it offers the DMG instead. Settings › About
+/// has the switch for automatic checks and a "Check for Updates" button.
 @MainActor
 @Observable
 final class UpdateChecker {
@@ -26,6 +27,7 @@ final class UpdateChecker {
         case checking
         case upToDate
         case available(Release)
+        case installing(Release)
         case failed
     }
 
@@ -41,7 +43,7 @@ final class UpdateChecker {
     private static let launchDelay: Duration = .seconds(15)
     private static let interval: TimeInterval = 24 * 60 * 60
 
-    static var currentVersion: AppVersion? {
+    nonisolated static var currentVersion: AppVersion? {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String).flatMap(AppVersion.init)
     }
 
@@ -68,7 +70,11 @@ final class UpdateChecker {
     /// a check from the button always answers.
     func check(userInitiated: Bool) async {
         guard userInitiated || Preferences.checkForUpdates else { return }
-        guard status != .checking, let current = Self.currentVersion else { return }
+        guard let current = Self.currentVersion else { return }
+        switch status {
+        case .checking, .installing: return
+        default: break
+        }
         status = .checking
         do {
             let release = try await fetchLatestRelease()
@@ -96,6 +102,31 @@ final class UpdateChecker {
     /// Opens the DMG download, or the release page if it has no DMG.
     func download(_ release: Release) {
         NSWorkspace.shared.open(release.downloadURL ?? release.pageURL)
+    }
+
+    /// Whether this copy can replace itself with `release`: it needs the DMG, a signature an update
+    /// can be checked against, and a folder it may write to.
+    func canInstall(_ release: Release) -> Bool {
+        release.downloadURL != nil && UpdateInstaller.canReplaceRunningApp
+    }
+
+    /// Downloads, checks and installs `release`, then relaunches. On failure, offers the DMG.
+    func install(_ release: Release) {
+        guard let dmg = release.downloadURL else { return download(release) }
+        if case .installing = status { return }
+        status = .installing(release)
+        logger.notice("Installing \(release.version.description, privacy: .public)")
+        Task {
+            do {
+                try await UpdateInstaller.install(dmg: dmg, version: release.version)
+                logger.notice("Installed \(release.version.description, privacy: .public); relaunching")
+                UpdateInstaller.relaunch()
+            } catch {
+                logger.error("Update install failed: \(String(describing: error), privacy: .public)")
+                status = .available(release)
+                showInstallFailure(release, error: error)
+            }
+        }
     }
 
     // MARK: GitHub
@@ -133,14 +164,17 @@ final class UpdateChecker {
     private func prompt(for release: Release, current: AppVersion) {
         let alert = NSAlert()
         alert.messageText = "Notchi \(release.version) is available"
-        alert.informativeText = "You have \(current). Download the new version, open it, and drag Notchi onto Applications to replace this one. Your settings stay as they are."
+        let installs = canInstall(release)
+        alert.informativeText = installs
+            ? "You have \(current). Notchi installs the update and reopens in a few seconds. Your settings and permissions stay as they are."
+            : "You have \(current). Download the new version, open it, and drag Notchi onto Applications to replace this one. Your settings stay as they are."
         alert.icon = NSApp.applicationIconImage
-        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: installs ? "Install and Relaunch" : "Download")
         alert.addButton(withTitle: "Later")
         alert.addButton(withTitle: "Skip This Version")
         switch run(alert) {
         case .alertFirstButtonReturn:
-            download(release)
+            if installs { install(release) } else { download(release) }
         case .alertThirdButtonReturn:
             UserDefaults.standard.set(release.version.description, forKey: Preferences.Key.skippedUpdateVersion)
         default:
@@ -154,6 +188,16 @@ final class UpdateChecker {
         alert.informativeText = "Version \(current) is the latest."
         alert.icon = NSApp.applicationIconImage
         run(alert)
+    }
+
+    private func showInstallFailure(_ release: Release, error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn't install Notchi \(release.version)"
+        alert.informativeText = "\(error.localizedDescription) You can download it and install it yourself instead."
+        alert.icon = NSApp.applicationIconImage
+        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: "Cancel")
+        if run(alert) == .alertFirstButtonReturn { download(release) }
     }
 
     private func showFailure() {

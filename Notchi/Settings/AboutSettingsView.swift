@@ -66,10 +66,15 @@ extension AboutSettingsView {
                 Button("Check for Updates…") {
                     Task { await updates.check(userInitiated: true) }
                 }
-                .disabled(updates.status == .checking)
+                .disabled(isBusy)
                 if case .available(let release) = updates.status {
-                    Button("Download \(release.version)") { updates.download(release) }
-                        .buttonStyle(.borderedProminent)
+                    if updates.canInstall(release) {
+                        Button("Install \(release.version)") { updates.install(release) }
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        Button("Download \(release.version)") { updates.download(release) }
+                            .buttonStyle(.borderedProminent)
+                    }
                 }
             }
             Toggle("Check for updates automatically", isOn: $checkForUpdates)
@@ -80,9 +85,17 @@ extension AboutSettingsView {
         }
     }
 
+    private var isBusy: Bool {
+        switch updates.status {
+        case .checking, .installing: true
+        default: false
+        }
+    }
+
     private var updateStatus: String {
         switch updates.status {
         case .checking: return "Checking…"
+        case .installing(let release): return "Installing Notchi \(release.version)…"
         case .available(let release): return "Notchi \(release.version) is available."
         case .failed: return "Couldn't reach GitHub."
         case .idle, .upToDate:
