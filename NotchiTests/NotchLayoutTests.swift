@@ -201,6 +201,21 @@ struct MenuBarSafeZoneTests {
         }
     }
 
+    /// Around a bubble the notch steps aside too, after a delay: the zone covers the bubble and the
+    /// gap to the notch, and meets the immediate zone without overlapping it.
+    @Test(arguments: [NotchGeometry.previewNotch, NotchGeometry.previewIsland])
+    func bubbleZonesCoverTheBubbles(geometry: NotchGeometry) {
+        let compact = NotchLayout.make(state: .compact, geometry: geometry)
+        let zones = compact.menuBarBubbleZones(satellites: [.trailing], in: geometry)
+        let bubble = compact.satelliteHitRect(.trailing, in: geometry)
+
+        #expect(zones.count == 1)
+        #expect(zones.contains { $0.contains(CGPoint(x: bubble.midX, y: bubble.midY)) })
+        #expect(zones[0].minX == geometry.centerX + compact.size.width / 2)
+        #expect(!compact.menuBarSafeZones(in: geometry).contains { $0.intersection(zones[0]).width > 0 })
+        #expect(compact.menuBarBubbleZones(satellites: [], in: geometry).isEmpty)
+    }
+
     @Test func idleCoversNoMenuBar() {
         let geometry = NotchGeometry.previewNotch
         let idle = NotchLayout.make(state: .idle, geometry: geometry)

@@ -118,6 +118,21 @@ struct NotchLayout: Equatable, Sendable {
         }
     }
 
+    /// The menu bar beside the compact notch out past each bubble, in global AppKit coordinates.
+    /// A bubble takes clicks (to swap), so the pointer resting there only makes the notch step aside
+    /// after a delay, uncovering the menu bar icons underneath.
+    func menuBarBubbleZones(satellites: [SatelliteSide], in geometry: NotchGeometry) -> [CGRect] {
+        let inner = size.width / 2
+        let outer = satelliteCenterOffset + satelliteDiameter / 2
+        guard outer > inner else { return [] }
+        let top = geometry.screenFrame.maxY
+        let bottom = top - geometry.menuBarHeight
+        return SatelliteSide.allCases.filter(satellites.contains).map { side in
+            let minX = side == .leading ? geometry.centerX - outer : geometry.centerX + inner
+            return CGRect(x: minX, y: bottom, width: outer - inner, height: top - bottom + 1)
+        }
+    }
+
     /// The expanded radii the user picked; compact scales them by its defaults' ratio.
     private struct NotchCorners {
         var bottom: CGFloat

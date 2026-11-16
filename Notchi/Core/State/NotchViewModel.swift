@@ -10,7 +10,7 @@ protocol NotchViewModelDelegate: AnyObject {
     func notchGeometryDidChange()
     /// Full-screen hiding turned on or off; hover and clicks follow.
     func notchSuppressionDidChange()
-    /// `menuBarSafeZones` changed without a transition.
+    /// `menuBarSafeZones` or `menuBarBubbleZones` changed without a transition.
     func notchSafeZonesDidChange()
 }
 
@@ -37,6 +37,9 @@ final class NotchViewModel {
     /// clickable), in global coordinates. Kept while stepping aside, so the pointer can stay there.
     /// Empty unless an activity is (or would be) showing compact.
     @ObservationIgnored private(set) var menuBarSafeZones: [CGRect] = []
+    /// The menu bar around the bubbles beside the compact notch: resting there steps aside too, but
+    /// only after `Preferences.bubbleStepAsideDelay`, so the bubbles can still be clicked.
+    @ObservationIgnored private(set) var menuBarBubbleZones: [CGRect] = []
     /// Other live activities, as bubbles either side of the compact notch.
     private(set) var satellites = SatelliteSlots()
     /// The module compact mode shows. Committed here with each transition rather than read live
@@ -258,7 +261,9 @@ final class NotchViewModel {
         geometry = newGeometry
         layout = targetLayout(for: state)
         if !menuBarSafeZones.isEmpty {
-            menuBarSafeZones = targetLayout(for: .compact).menuBarSafeZones(in: geometry)
+            let compact = targetLayout(for: .compact)
+            menuBarSafeZones = compact.menuBarSafeZones(in: geometry)
+            menuBarBubbleZones = compact.menuBarBubbleZones(satellites: satellites.occupied, in: geometry)
         }
         delegate?.notchGeometryDidChange()
     }
@@ -302,11 +307,13 @@ final class NotchViewModel {
         let newCompactID = target == .compact ? foreground?.id : nil
         // Mid-swap the slots are the swap's to manage; it re-evaluates when it's done.
         let newSatellites = swapTask == nil ? satellites.reconciled(with: registry.satelliteCandidates.map(\.id)) : satellites
-        let zones = showsCompact && Preferences.menuBarSafeZone
-            ? targetLayout(for: .compact).menuBarSafeZones(in: geometry)
-            : []
-        let zonesChanged = zones != menuBarSafeZones
+        let makesRoom = showsCompact && Preferences.menuBarSafeZone
+        let compact = targetLayout(for: .compact)
+        let zones = makesRoom ? compact.menuBarSafeZones(in: geometry) : []
+        let bubbleZones = makesRoom ? compact.menuBarBubbleZones(satellites: newSatellites.occupied, in: geometry) : []
+        let zonesChanged = zones != menuBarSafeZones || bubbleZones != menuBarBubbleZones
         menuBarSafeZones = zones
+        menuBarBubbleZones = bubbleZones
         guard target != state || newLayout != layout || newSatellites != satellites || newCompactID != compactModuleID else {
             if zonesChanged { delegate?.notchSafeZonesDidChange() }
             return

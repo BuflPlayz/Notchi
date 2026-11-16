@@ -21,6 +21,7 @@ enum Preferences {
         static let hideInFullScreen = "hideInFullScreen"
         static let menuBarSafeZone = "menuBarSafeZone"
         static let notchDisplay = "notchDisplay"
+        static let bubbleStepAsideDelay = "bubbleStepAsideDelay"
         static let checkForUpdates = "checkForUpdates"
         /// Not settings: when updates were last checked, and a version the user chose to skip.
         static let lastUpdateCheck = "lastUpdateCheck"
@@ -55,6 +56,8 @@ enum Preferences {
     enum Default {
         static let expandDelay = 0.25
         static let collapseDelay = 0.0
+        /// Seconds the pointer rests on a bubble before the notch steps aside for the menu bar icons under it.
+        static let bubbleStepAsideDelay = 1.0
         static let compactSideWidth = 42.0
         static let expandedWidth = 530.0
         static let islandVisibleWhenIdle = false
@@ -74,7 +77,7 @@ enum Preferences {
     static let allKeys = [
         Key.expandDelay, Key.collapseDelay, Key.hapticsEnabled, Key.compactSideWidth, Key.expandedWidth,
         Key.showAllMediaSources, Key.realAudioVisualizer, Key.replaceSystemHUD, Key.batteryAlerts,
-        Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen, Key.menuBarSafeZone, Key.notchDisplay,
+        Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen, Key.menuBarSafeZone, Key.bubbleStepAsideDelay, Key.notchDisplay,
         Key.checkForUpdates, Key.skippedUpdateVersion,
         Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
         Key.compactAlignment, Key.compactLip, Key.openAnimation, Key.openDuration, Key.openBounce,
@@ -101,6 +104,7 @@ enum Preferences {
             Key.hideInFullScreen: true,
             Key.menuBarSafeZone: true,
             Key.notchDisplay: NotchDisplay.main.rawValue,
+            Key.bubbleStepAsideDelay: Default.bubbleStepAsideDelay,
             Key.checkForUpdates: true,
             Key.glassClarity: Default.glassClarity,
             Key.edgeHighlight: Default.edgeHighlight,
@@ -150,6 +154,9 @@ enum Preferences {
     static var hideInFullScreen: Bool { value(Key.hideInFullScreen, default: true) }
     /// The live activity tucks back into the notch while the pointer is on the menu bar icons it covers.
     static var menuBarSafeZone: Bool { value(Key.menuBarSafeZone, default: true) }
+    /// Seconds the pointer rests on a bubble before the notch steps aside for the menu bar icons
+    /// under it. Until then the bubble takes clicks.
+    static var bubbleStepAsideDelay: Double { value(Key.bubbleStepAsideDelay, default: Default.bubbleStepAsideDelay) }
     /// The display the notch lives on: the main one, or the MacBook's own screen with the notch.
     static var notchDisplay: NotchDisplay {
         NotchDisplay(rawValue: value(Key.notchDisplay, default: "")) ?? .main

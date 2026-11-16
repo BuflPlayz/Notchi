@@ -9,7 +9,9 @@ import AppKit
 ///
 /// Safe zones are the menu bar beside the notch that the compact shape covers. There the panel
 /// never takes the mouse, even over the shape, and reports it, so the notch can step aside and
-/// uncover the menu bar icons underneath.
+/// uncover the menu bar icons underneath. Delayed safe zones (around the activity bubbles) work the
+/// same once the pointer has rested there for `Preferences.bubbleStepAsideDelay`; until then the
+/// bubble under it takes clicks.
 ///
 /// A press that starts on the panel freezes all of this until the button comes up, so the pointer
 /// can swipe from the notch toward a bubble (across the menu bar beside it) without the panel
@@ -33,6 +35,10 @@ final class HoverController {
     /// Areas that take clicks without counting as a hover (the activity bubbles beside the notch).
     private var clickRects: [CGRect] = []
     private var safeZones: [CGRect] = []
+    private var delayedSafeZones: [CGRect] = []
+    /// The pointer has rested in a delayed safe zone long enough; it counts as a safe zone until it leaves.
+    private var delayedZoneArmed = false
+    private var delayedZoneTimer: Timer?
     private var isInside = false
     private var isInSafeZone = false
     private var isPressing = false
@@ -89,10 +95,11 @@ final class HoverController {
 
     /// Sets the interactive area (screen coordinates) to the shape's new target frame, plus areas
     /// that only need to be clickable, and the safe zones that take precedence over both.
-    func setHitRect(_ rect: CGRect, clickable: [CGRect] = [], safeZones: [CGRect] = []) {
+    func setHitRect(_ rect: CGRect, clickable: [CGRect] = [], safeZones: [CGRect] = [], delayedSafeZones: [CGRect] = []) {
         hitRect = rect
         clickRects = clickable
         self.safeZones = safeZones
+        self.delayedSafeZones = delayedSafeZones
         update(cursorMoved: false)
     }
 
@@ -100,6 +107,8 @@ final class HoverController {
         guard pressing != isPressing else { return }
         isPressing = pressing
         onPressChange?(pressing)
+        // A click on a bubble starts its wait over (it may have just swapped in something new).
+        disarmDelayedZone()
         if !pressing {
             safeZoneWaitsForMove = true
             update(cursorMoved: false)
@@ -113,7 +122,16 @@ final class HoverController {
         let location = NSEvent.mouseLocation
         let reach = isDragging ? -Metrics.dropReach : 0
         // A drag still finds the notch anywhere; dropping onto a menu bar icon isn't a thing.
-        let inSafeZone = !isDragging && (!safeZoneWaitsForMove || isInSafeZone) && safeZones.contains { $0.contains(location) }
+        let inDelayedZone = !isDragging && delayedSafeZones.contains { $0.contains(location) }
+        if !inDelayedZone {
+            disarmDelayedZone()
+        } else if cursorMoved && !delayedZoneArmed && !isInSafeZone && delayedZoneTimer == nil {
+            startDelayedZoneTimer()
+        }
+        // Already stepped aside, the bubbles are tucked away too: around them counts at once.
+        let inZone = safeZones.contains { $0.contains(location) }
+            || (inDelayedZone && (delayedZoneArmed || isInSafeZone))
+        let inSafeZone = !isDragging && (!safeZoneWaitsForMove || isInSafeZone) && inZone
         let inside = !inSafeZone && hitRect.insetBy(dx: reach, dy: reach).contains(location)
         let clickable = inside || (!inSafeZone && clickRects.contains { $0.contains(location) })
         if panel.ignoresMouseEvents == clickable {
@@ -131,5 +149,24 @@ final class HoverController {
         if inside && !cursorMoved { return }
         isInside = inside
         onHoverChange?(inside)
+    }
+
+    private func startDelayedZoneTimer() {
+        let timer = Timer(timeInterval: max(Preferences.bubbleStepAsideDelay, 0), repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.delayedZoneTimer = nil
+                self.delayedZoneArmed = true
+                self.update(cursorMoved: false)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        delayedZoneTimer = timer
+    }
+
+    private func disarmDelayedZone() {
+        delayedZoneTimer?.invalidate()
+        delayedZoneTimer = nil
+        delayedZoneArmed = false
     }
 }
