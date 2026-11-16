@@ -56,6 +56,16 @@ struct GeneralSettingsView: View {
                 SettingsFootnote("Main display is the one with the menu bar in System Settings › Displays. Built-in display keeps Notchi in the MacBook's notch even when an external display is main; with the lid closed it moves to the main display until the built-in screen is back.")
             }
 
+            if Self.hasMenuBarLiveActivities {
+                Section {
+                    LabeledContent("macOS Live Activities") {
+                        Button("Open Menu Bar Settings…", action: Self.openMenuBarSettings)
+                    }
+                } footer: {
+                    SettingsFootnote("macOS can show Live Activities in the menu bar too, so a timer or what's playing can appear twice: in the notch and beside it. In System Settings › Menu Bar, scroll down to Live Activities and turn off the apps Notchi already shows. Other apps can't hide these for you.")
+                }
+            }
+
             Section {
                 Toggle("Open on hover", isOn: $openOnHover)
                 SettingsSliderRow(title: "Open after", value: $expandDelay, range: 0...0.6, step: 0.05, unit: "s", fractionDigits: 2)
@@ -126,6 +136,17 @@ struct GeneralSettingsView: View {
         } message: {
             Text("Sizes, behavior, module order and which modules are on go back to their defaults. Permissions and launch at login stay as they are.")
         }
+    }
+
+    /// macOS 26 and later can put Live Activities in the menu bar, next to (or under) the notch's own.
+    private static var hasMenuBarLiveActivities: Bool {
+        ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 0))
+    }
+
+    /// Opens System Settings › Menu Bar, where the Live Activities switch is.
+    private static func openMenuBarSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.ControlCenter-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     /// The notch display's physical notch height, or a typical one when it has no notch.
