@@ -83,7 +83,7 @@ final class NotchWindowController: NotchViewModelDelegate {
             layout.hitRect(in: model.geometry),
             clickable: satellites.map { layout.satelliteHitRect($0, in: model.geometry) },
             safeZones: model.menuBarSafeZones,
-            delayedSafeZones: model.menuBarBubbleZones
+            bubbleZones: model.menuBarBubbleZones
         )
     }
 

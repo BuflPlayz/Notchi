@@ -7,11 +7,12 @@ import AppKit
 /// Inside, the panel takes mouse events. Outside, it ignores them, so they fall through to whatever
 /// is underneath. Monitors only fire while the mouse moves, so this costs nothing at rest.
 ///
-/// Safe zones are the menu bar beside the notch that the compact shape covers. There the panel
-/// never takes the mouse, even over the shape, and reports it, so the notch can step aside and
-/// uncover the menu bar icons underneath. Delayed safe zones (around the activity bubbles) work the
-/// same once the pointer has rested there for `Preferences.bubbleStepAsideDelay`; until then the
-/// bubble under it takes clicks.
+/// Safe zones are the menu bar the compact notch covers: beside the physical notch, and around the
+/// activity bubbles. Once the pointer has rested in one for its delay (`menuBarStepAsideDelay`
+/// beside the notch, `bubbleStepAsideDelay` around a bubble), the panel stops taking the mouse there
+/// and reports it, so the notch can step aside and uncover the menu bar icons underneath. While it
+/// waits, the shape and bubbles take clicks but don't count as a hover, so the notch doesn't open.
+/// Once stepped aside, every safe zone counts at once.
 ///
 /// A press that starts on the panel freezes all of this until the button comes up, so the pointer
 /// can swipe from the notch toward a bubble (across the menu bar beside it) without the panel
@@ -35,10 +36,12 @@ final class HoverController {
     /// Areas that take clicks without counting as a hover (the activity bubbles beside the notch).
     private var clickRects: [CGRect] = []
     private var safeZones: [CGRect] = []
-    private var delayedSafeZones: [CGRect] = []
-    /// The pointer has rested in a delayed safe zone long enough; it counts as a safe zone until it leaves.
-    private var delayedZoneArmed = false
-    private var delayedZoneTimer: Timer?
+    private var bubbleZones: [CGRect] = []
+    /// The kind of safe zone the pointer is waiting in, and whether its delay has run out (it then
+    /// counts as a safe zone until the pointer leaves the safe zones).
+    private var waitingZone: SafeZone?
+    private var zoneArmed = false
+    private var zoneTimer: Timer?
     private var isInside = false
     private var isInSafeZone = false
     private var isPressing = false
@@ -95,11 +98,11 @@ final class HoverController {
 
     /// Sets the interactive area (screen coordinates) to the shape's new target frame, plus areas
     /// that only need to be clickable, and the safe zones that take precedence over both.
-    func setHitRect(_ rect: CGRect, clickable: [CGRect] = [], safeZones: [CGRect] = [], delayedSafeZones: [CGRect] = []) {
+    func setHitRect(_ rect: CGRect, clickable: [CGRect] = [], safeZones: [CGRect] = [], bubbleZones: [CGRect] = []) {
         hitRect = rect
         clickRects = clickable
         self.safeZones = safeZones
-        self.delayedSafeZones = delayedSafeZones
+        self.bubbleZones = bubbleZones
         update(cursorMoved: false)
     }
 
@@ -107,8 +110,8 @@ final class HoverController {
         guard pressing != isPressing else { return }
         isPressing = pressing
         onPressChange?(pressing)
-        // A click on a bubble starts its wait over (it may have just swapped in something new).
-        disarmDelayedZone()
+        // A click starts the wait over (a bubble may have just swapped in something new).
+        disarmZone()
         if !pressing {
             safeZoneWaitsForMove = true
             update(cursorMoved: false)
@@ -122,18 +125,21 @@ final class HoverController {
         let location = NSEvent.mouseLocation
         let reach = isDragging ? -Metrics.dropReach : 0
         // A drag still finds the notch anywhere; dropping onto a menu bar icon isn't a thing.
-        let inDelayedZone = !isDragging && delayedSafeZones.contains { $0.contains(location) }
-        if !inDelayedZone {
-            disarmDelayedZone()
-        } else if cursorMoved && !delayedZoneArmed && !isInSafeZone && delayedZoneTimer == nil {
-            startDelayedZoneTimer()
+        let zone: SafeZone? = isDragging ? nil
+            : safeZones.contains { $0.contains(location) } ? .besideNotch
+            : bubbleZones.contains { $0.contains(location) } ? .bubble
+            : nil
+        if let zone {
+            // Waiting starts once the pointer has moved since a press (see `safeZoneWaitsForMove`).
+            if !isInSafeZone && !zoneArmed && zone != waitingZone && !safeZoneWaitsForMove { wait(in: zone) }
+        } else {
+            disarmZone()
         }
-        // Already stepped aside, the bubbles are tucked away too: around them counts at once.
-        let inZone = safeZones.contains { $0.contains(location) }
-            || (inDelayedZone && (delayedZoneArmed || isInSafeZone))
-        let inSafeZone = !isDragging && (!safeZoneWaitsForMove || isInSafeZone) && inZone
-        let inside = !inSafeZone && hitRect.insetBy(dx: reach, dy: reach).contains(location)
-        let clickable = inside || (!inSafeZone && clickRects.contains { $0.contains(location) })
+        let inSafeZone = zone != nil && (zoneArmed || isInSafeZone)
+        let isWaiting = zone != nil && !inSafeZone
+        let onShape = hitRect.insetBy(dx: reach, dy: reach).contains(location)
+        let inside = !inSafeZone && !isWaiting && onShape
+        let clickable = !inSafeZone && (onShape || clickRects.contains { $0.contains(location) })
         if panel.ignoresMouseEvents == clickable {
             panel.ignoresMouseEvents = !clickable
         }
@@ -151,22 +157,39 @@ final class HoverController {
         onHoverChange?(inside)
     }
 
-    private func startDelayedZoneTimer() {
-        let timer = Timer(timeInterval: max(Preferences.bubbleStepAsideDelay, 0), repeats: false) { [weak self] _ in
+    /// Starts the wait for the kind of safe zone the pointer is in. Without a delay it counts at once.
+    private func wait(in zone: SafeZone) {
+        disarmZone()
+        waitingZone = zone
+        let delay = zone == .besideNotch ? Preferences.menuBarStepAsideDelay : Preferences.bubbleStepAsideDelay
+        guard delay > 0 else {
+            zoneArmed = true
+            return
+        }
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.delayedZoneTimer = nil
-                self.delayedZoneArmed = true
+                self.zoneTimer = nil
+                self.zoneArmed = true
                 self.update(cursorMoved: false)
             }
         }
         RunLoop.main.add(timer, forMode: .common)
-        delayedZoneTimer = timer
+        zoneTimer = timer
     }
 
-    private func disarmDelayedZone() {
-        delayedZoneTimer?.invalidate()
-        delayedZoneTimer = nil
-        delayedZoneArmed = false
+    private func disarmZone() {
+        zoneTimer?.invalidate()
+        zoneTimer = nil
+        waitingZone = nil
+        zoneArmed = false
     }
+}
+
+/// The two kinds of menu bar the compact notch covers, each with its own wait before stepping aside.
+private enum SafeZone {
+    /// Beside the physical notch (or resting island).
+    case besideNotch
+    /// Around an activity bubble, and the gap between it and the notch.
+    case bubble
 }
