@@ -100,17 +100,18 @@ struct NotchLayout: Equatable, Sendable {
         )
     }
 
-    /// The menu bar this layout (and its bubbles) covers beside the physical notch, or beside the
-    /// resting island, in global AppKit coordinates: up to two rects, left and right. Menu bar icons
-    /// can sit underneath, so the pointer there makes the notch step aside instead of opening it.
-    func menuBarSafeZones(satellites: [SatelliteSide], in geometry: NotchGeometry) -> [CGRect] {
+    /// The menu bar this layout covers beside the physical notch, or beside the resting island, in
+    /// global AppKit coordinates: up to two rects, left and right. Menu bar icons can sit underneath,
+    /// so the pointer there makes the notch step aside instead of opening it. The activity bubbles
+    /// are left out: they take clicks to swap the activity, which a bubble that hid on approach
+    /// couldn't.
+    func menuBarSafeZones(in geometry: NotchGeometry) -> [CGRect] {
         let core = geometry.idleSize.width / 2
-        let bubbleReach = satelliteCenterOffset + satelliteDiameter / 2
+        let reach = size.width / 2
+        guard reach > core else { return [] }
         let top = geometry.screenFrame.maxY
         let bottom = top - geometry.menuBarHeight
-        return SatelliteSide.allCases.compactMap { side in
-            let reach = satellites.contains(side) ? max(size.width / 2, bubbleReach) : size.width / 2
-            guard reach > core else { return nil }
+        return SatelliteSide.allCases.map { side in
             let minX = side == .leading ? geometry.centerX - reach : geometry.centerX + core
             // 1 pt past the top edge, like `hitRect`, where the cursor sits when pushed into the bar.
             return CGRect(x: minX, y: bottom, width: reach - core, height: top - bottom + 1)

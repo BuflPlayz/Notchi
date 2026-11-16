@@ -33,9 +33,9 @@ final class NotchViewModel {
     /// True while the pointer is on menu bar icons that the compact notch covers: the live activity
     /// tucks back into the notch so they show and take clicks.
     private(set) var isSteppingAside = false
-    /// The menu bar the compact notch and its bubbles cover beside the physical notch, in global
-    /// coordinates. Kept while stepping aside, so the pointer can stay there. Empty unless an
-    /// activity is (or would be) showing compact.
+    /// The menu bar the compact notch covers beside the physical notch (not its bubbles, which stay
+    /// clickable), in global coordinates. Kept while stepping aside, so the pointer can stay there.
+    /// Empty unless an activity is (or would be) showing compact.
     @ObservationIgnored private(set) var menuBarSafeZones: [CGRect] = []
     /// Other live activities, as bubbles either side of the compact notch.
     private(set) var satellites = SatelliteSlots()
@@ -246,7 +246,7 @@ final class NotchViewModel {
         geometry = newGeometry
         layout = targetLayout(for: state)
         if !menuBarSafeZones.isEmpty {
-            menuBarSafeZones = targetLayout(for: .compact).menuBarSafeZones(satellites: satellites.occupied, in: geometry)
+            menuBarSafeZones = targetLayout(for: .compact).menuBarSafeZones(in: geometry)
         }
         delegate?.notchGeometryDidChange()
     }
@@ -291,7 +291,7 @@ final class NotchViewModel {
         // Mid-swap the slots are the swap's to manage; it re-evaluates when it's done.
         let newSatellites = swapTask == nil ? satellites.reconciled(with: registry.satelliteCandidates.map(\.id)) : satellites
         let zones = showsCompact && Preferences.menuBarSafeZone
-            ? targetLayout(for: .compact).menuBarSafeZones(satellites: newSatellites.occupied, in: geometry)
+            ? targetLayout(for: .compact).menuBarSafeZones(in: geometry)
             : []
         let zonesChanged = zones != menuBarSafeZones
         menuBarSafeZones = zones

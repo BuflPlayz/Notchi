@@ -34,7 +34,7 @@ final class AppEnvironment {
     }
 
     func start() {
-        guard let screen = ScreenTracker.mainDisplay else { return }
+        guard let screen = ScreenTracker.notchDisplay else { return }
 
         let model = NotchViewModel(
             geometry: .make(for: screen, forceIsland: Preferences.forceIsland),
@@ -49,7 +49,8 @@ final class AppEnvironment {
             return !model.registry.activityModules.contains { $0.id != "focus" && $0.liveActivity != nil }
         }
 
-        // Re-anchor on display changes: a notch on the built-in display, an island on an external main display.
+        // Re-anchor on display changes, or another pick in Settings: a notch on the built-in display, an
+        // island on an external one.
         screenTracker.onChange = { [weak self, weak model] screen in
             model?.updateGeometry(.make(for: screen, forceIsland: Preferences.forceIsland))
             self?.fullScreenMonitor.displayID = screen.displayID

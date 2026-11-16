@@ -20,6 +20,7 @@ enum Preferences {
         static let clockShowsPaused = "clockShowsPaused"
         static let hideInFullScreen = "hideInFullScreen"
         static let menuBarSafeZone = "menuBarSafeZone"
+        static let notchDisplay = "notchDisplay"
         static let checkForUpdates = "checkForUpdates"
         /// Not settings: when updates were last checked, and a version the user chose to skip.
         static let lastUpdateCheck = "lastUpdateCheck"
@@ -73,7 +74,7 @@ enum Preferences {
     static let allKeys = [
         Key.expandDelay, Key.collapseDelay, Key.hapticsEnabled, Key.compactSideWidth, Key.expandedWidth,
         Key.showAllMediaSources, Key.realAudioVisualizer, Key.replaceSystemHUD, Key.batteryAlerts,
-        Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen, Key.menuBarSafeZone,
+        Key.focusAlerts, Key.focusActivity, Key.openOnHover, Key.islandVisibleWhenIdle, Key.clockShowsPaused, Key.hideInFullScreen, Key.menuBarSafeZone, Key.notchDisplay,
         Key.checkForUpdates, Key.skippedUpdateVersion,
         Key.glassClarity, Key.edgeHighlight, Key.glassStyle, Key.notchBlend, Key.notchCornerRadius, Key.notchTopCurve,
         Key.compactAlignment, Key.compactLip, Key.openAnimation, Key.openDuration, Key.openBounce,
@@ -99,6 +100,7 @@ enum Preferences {
             Key.clockShowsPaused: true,
             Key.hideInFullScreen: true,
             Key.menuBarSafeZone: true,
+            Key.notchDisplay: NotchDisplay.main.rawValue,
             Key.checkForUpdates: true,
             Key.glassClarity: Default.glassClarity,
             Key.edgeHighlight: Default.edgeHighlight,
@@ -148,6 +150,10 @@ enum Preferences {
     static var hideInFullScreen: Bool { value(Key.hideInFullScreen, default: true) }
     /// The live activity tucks back into the notch while the pointer is on the menu bar icons it covers.
     static var menuBarSafeZone: Bool { value(Key.menuBarSafeZone, default: true) }
+    /// The display the notch lives on: the main one, or the MacBook's own screen with the notch.
+    static var notchDisplay: NotchDisplay {
+        NotchDisplay(rawValue: value(Key.notchDisplay, default: "")) ?? .main
+    }
     /// Look for a newer release on GitHub at launch and daily, and offer to download it.
     static var checkForUpdates: Bool { value(Key.checkForUpdates, default: true) }
     /// Show paused Clock timers and a paused stopwatch in compact mode, not just running ones.

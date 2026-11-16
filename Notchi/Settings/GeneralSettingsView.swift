@@ -13,6 +13,7 @@ struct GeneralSettingsView: View {
     @AppStorage(Preferences.Key.islandVisibleWhenIdle) private var islandVisibleWhenIdle = Preferences.Default.islandVisibleWhenIdle
     @AppStorage(Preferences.Key.hideInFullScreen) private var hideInFullScreen = true
     @AppStorage(Preferences.Key.menuBarSafeZone) private var menuBarSafeZone = true
+    @AppStorage(Preferences.Key.notchDisplay) private var notchDisplay = NotchDisplay.main
     @AppStorage(Preferences.Key.glassClarity) private var glassClarity = Preferences.Default.glassClarity
     @AppStorage(Preferences.Key.glassStyle) private var glassStyle = GlassStyle.clear
     @AppStorage(Preferences.Key.notchBlend) private var notchBlend = Preferences.Default.notchBlend
@@ -43,6 +44,16 @@ struct GeneralSettingsView: View {
                 if let error = launchAtLogin.lastError {
                     SettingsFootnote(error)
                 }
+            }
+
+            Section {
+                Picker("Show on", selection: $notchDisplay) {
+                    ForEach(NotchDisplay.allCases) { Text($0.title).tag($0) }
+                }
+            } header: {
+                Text("Display")
+            } footer: {
+                SettingsFootnote("Main display is the one with the menu bar in System Settings › Displays. Built-in display keeps Notchi in the MacBook's notch even when an external display is main; with the lid closed it moves to the main display until the built-in screen is back.")
             }
 
             Section {
@@ -117,9 +128,9 @@ struct GeneralSettingsView: View {
         }
     }
 
-    /// The main display's physical notch height, or a typical one when it has no notch.
+    /// The notch display's physical notch height, or a typical one when it has no notch.
     private var notchHeight: Double {
-        let top = NSScreen.screens.first?.safeAreaInsets.top ?? 0
+        let top = ScreenTracker.notchDisplay?.safeAreaInsets.top ?? 0
         return top > 0 ? Double(top) : 32
     }
 

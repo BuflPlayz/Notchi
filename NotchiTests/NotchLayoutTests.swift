@@ -175,7 +175,7 @@ struct MenuBarSafeZoneTests {
     @Test(arguments: [NotchGeometry.previewNotch, NotchGeometry.previewIsland])
     func safeZonesCoverTheMenuBarBesideTheNotch(geometry: NotchGeometry) {
         let compact = NotchLayout.make(state: .compact, geometry: geometry)
-        let zones = compact.menuBarSafeZones(satellites: [], in: geometry)
+        let zones = compact.menuBarSafeZones(in: geometry)
         let core = geometry.idleSize.width / 2
         let top = geometry.screenFrame.maxY
 
@@ -190,19 +190,20 @@ struct MenuBarSafeZoneTests {
         #expect(zones.map(\.maxX).max() == geometry.centerX + compact.size.width / 2)
     }
 
-    @Test func safeZoneReachesOverABubble() {
-        let geometry = NotchGeometry.previewNotch
+    /// The bubbles swap the activity on click, so the pointer on one must not tuck it away.
+    @Test(arguments: [NotchGeometry.previewNotch, NotchGeometry.previewIsland])
+    func safeZonesLeaveTheBubblesClickable(geometry: NotchGeometry) {
         let compact = NotchLayout.make(state: .compact, geometry: geometry)
-        let zones = compact.menuBarSafeZones(satellites: [.trailing], in: geometry)
-        let bubble = compact.satelliteHitRect(.trailing, in: geometry)
-
-        #expect(zones.contains { $0.contains(CGPoint(x: bubble.midX, y: bubble.midY)) })
-        #expect(zones.map(\.minX).min() == geometry.centerX - compact.size.width / 2)
+        let zones = compact.menuBarSafeZones(in: geometry)
+        for side in SatelliteSide.allCases {
+            let bubble = compact.satelliteHitRect(side, in: geometry)
+            #expect(!zones.contains { $0.intersects(bubble) })
+        }
     }
 
     @Test func idleCoversNoMenuBar() {
         let geometry = NotchGeometry.previewNotch
         let idle = NotchLayout.make(state: .idle, geometry: geometry)
-        #expect(idle.menuBarSafeZones(satellites: [], in: geometry).isEmpty)
+        #expect(idle.menuBarSafeZones(in: geometry).isEmpty)
     }
 }
