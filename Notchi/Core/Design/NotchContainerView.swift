@@ -18,6 +18,8 @@ struct NotchContainerView: View {
     @AppStorage(Preferences.Key.edgeHighlight) private var edgeHighlight = Preferences.Default.edgeHighlight
 
     @Namespace private var namespace
+    /// How far the compact content leans toward a swipe in progress.
+    @State private var swipeLean: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openSettings) private var openSettings
 
@@ -74,10 +76,30 @@ struct NotchContainerView: View {
             }
             .opacity(isHiddenAtRest ? 0 : 1)
             .animation(Motion.content, value: isHiddenAtRest)
-            // Only the surface opens the panel; the bubbles beside it swap instead.
-            .simultaneousGesture(TapGesture().onEnded {
-                if model.state != .expanded { model.expandNow() }
-            })
+            // Only the surface opens the panel; the bubbles beside it swap instead. Pressing and
+            // swiping the compact surface toward a bubble swaps too. Off while open, so the page's
+            // own controls (sliders, lists) have the mouse to themselves.
+            .simultaneousGesture(pressGesture, including: model.state == .expanded ? .subviews : .all)
+    }
+
+    /// A click opens the notch; a swipe on the compact notch toward a bubble swaps it in.
+    private var pressGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard model.state == .compact, !SatelliteSwipe.isClick(value.translation) else { return }
+                let dx = value.translation.width
+                let hasTarget = model.satellites[dx < 0 ? .leading : .trailing] != nil
+                swipeLean = reduceMotion ? 0 : SatelliteSwipe.lean(for: dx, hasTarget: hasTarget)
+            }
+            .onEnded { value in
+                withAnimation(Motion.swap) { swipeLean = 0 }
+                if SatelliteSwipe.isClick(value.translation) {
+                    if model.state != .expanded { model.expandNow() }
+                } else if model.state == .compact,
+                          let side = SatelliteSwipe.side(translation: value.translation, predictedEnd: value.predictedEndTranslation) {
+                    model.swipe(toward: side)
+                }
+            }
     }
 
     /// Other live activities, in detached bubbles either side of the compact surface.
@@ -110,6 +132,7 @@ struct NotchContainerView: View {
                     CompactContentView(module: module, layout: layout)
                         .id(module.id)
                         .transition(Motion.contentTransition(reduceMotion: reduceMotion))
+                        .offset(x: swipeLean)
                 }
             case .expanded:
                 ExpandedContentView(model: model, layout: layout)

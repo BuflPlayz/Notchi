@@ -34,6 +34,9 @@ final class NotchWindowController: NotchViewModelDelegate {
         hover.onSafeZoneChange = { [weak model] isInSafeZone in
             model?.setSteppingAside(isInSafeZone)
         }
+        hover.onPressChange = { [weak model] isPressing in
+            model?.setPressing(isPressing)
+        }
         model.delegate = self
         dragDetector.onChange = { [weak self] isDragging in
             self?.hover.isDragging = isDragging

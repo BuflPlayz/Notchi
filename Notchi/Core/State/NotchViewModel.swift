@@ -198,6 +198,18 @@ final class NotchViewModel {
         setExpandRequested(false)
     }
 
+    /// The pointer went down on the notch (or came back up). A press isn't a hover: holding the
+    /// compact notch to swipe mustn't open it.
+    func setPressing(_ pressing: Bool) {
+        if pressing { hoverTask?.cancel() }
+    }
+
+    /// Press and swipe on the compact notch toward a bubble: that bubble's activity comes to the middle.
+    func swipe(toward side: SatelliteSide) {
+        guard let id = satellites[side] else { return }
+        bringToFront(id)
+    }
+
     /// Click on a bubble: its activity swaps places with the one in the middle, and the one it
     /// replaces takes the bubble's slot.
     func bringToFront(_ id: String) {

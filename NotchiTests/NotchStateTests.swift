@@ -140,6 +140,23 @@ struct SatelliteTests {
         #expect(model.visibleSatellites.isEmpty)
     }
 
+    @Test func swipingTowardABubbleSwapsIt() {
+        let registry = makeRegistry()
+        registry.register(TestModule(id: "clock", priority: .active))
+        registry.register(TestModule(id: "media", priority: .active))
+        let model = NotchViewModel(geometry: .previewNotch, registry: registry)
+        #expect(model.satellites.trailing == "media")
+
+        // Nothing waits on the left, so a swipe that way leaves things as they are.
+        model.swipe(toward: .leading)
+        #expect(registry.foreground?.id == "clock")
+        #expect(model.swapCount == 0)
+
+        model.swipe(toward: .trailing)
+        #expect(registry.foreground?.id == "media")
+        #expect(model.swapCount == 1)
+    }
+
     @Test func toastOverAnActivityClosesAndReopensTheNotch() async {
         guard Motion.reopensForToasts else { return }   // Reduce Motion swaps in place
         let registry = makeRegistry()
